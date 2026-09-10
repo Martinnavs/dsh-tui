@@ -1,0 +1,35 @@
+dsh_home=/home/bertie/Documents/projects/dsh-tui/investigation/probe/dsh-home
+[12888.739] session.event agent/inbox/spliced {"sessionId": "probe-002-tool", "event": {"type": "agent/inbox/spliced", "seq": 3, "time": 1789043155710, "data": {"target": "next-turn", "start": 0, "inserted"
+[12888.739] session.status  {"sessionId": "probe-002-tool", "status": "running"}
+[12888.739] session.event turn/start {"sessionId": "probe-002-tool", "event": {"type": "turn/start", "seq": 4, "time": 1789043155712, "data": {"turn": 1}}}
+[12888.739] session.event agent/inbox/spliced {"sessionId": "probe-002-tool", "event": {"type": "agent/inbox/spliced", "seq": 5, "time": 1789043155713, "data": {"target": "next-turn", "start": 0, "removedCo
+[12889.024] session.event step/start {"sessionId": "probe-002-tool", "event": {"type": "step/start", "seq": 6, "time": 1789043156003, "data": {"turn": 1, "step": 1}}}
+[12889.027] session.event system/message {"sessionId": "probe-002-tool", "event": {"type": "system/message", "seq": 7, "time": 1789043156005, "data": {"turn": 1, "step": 1, "message": {"role": "system"
+[12889.028] session.event user/message {"sessionId": "probe-002-tool", "event": {"type": "user/message", "seq": 8, "time": 1789043156007, "data": {"content": [{"type": "text", "text": "Use your bash 
+[12889.029] session.event user/message {"sessionId": "probe-002-tool", "event": {"type": "user/message", "seq": 9, "time": 1789043156008, "data": {"content": [{"type": "text", "text": "Current runtim
+[12889.029] session.event user/message {"sessionId": "probe-002-tool", "event": {"type": "user/message", "seq": 10, "time": 1789043156008, "data": {"content": [{"type": "text", "text": "<system-remin
+[12889.032] session.event request/header {"sessionId": "probe-002-tool", "event": {"type": "request/header", "seq": 11, "time": 1789043156010, "data": {"header": {"config": {"provider": "onit", "model"
+[12889.032] session.event request/context {"sessionId": "probe-002-tool", "event": {"type": "request/context", "seq": 12, "time": 1789043156012, "data": {"provider": "onit", "model": "Qwen/Qwen3.8-27B",
+[12889.036] session.event session/title {"sessionId": "probe-002-tool", "event": {"type": "session/title", "seq": 13, "time": 1789043156015, "data": {"title": "Use your bash tool to", "messageSeqs": [
+[12891.216] session.event assistant/message {"sessionId": "probe-002-tool", "event": {"type": "assistant/message", "seq": 14, "time": 1789043158194, "data": {"turn": 1, "step": 1, "message": {"role": "ass
+    -> assistant/message #1, 0 chars: ''
+[12891.219] session.event tool/call {"sessionId": "probe-002-tool", "event": {"type": "tool/call", "seq": 15, "time": 1789043158198, "data": {"turn": 1, "step": 1, "callId": "chatcmpl-tool-ae7ee6f3ddfbc123", "name": "bash", "arguments": "{\"command\":\"echo hello-from-dsh-tool\",\"description\":\"Echo test string\"}"}}}
+[12891.603] session.event tool/result {"sessionId": "probe-002-tool", "event": {"type": "tool/result", "seq": 16, "time": 1789043158583, "data": {"turn": 1, "step": 1, "message": {"source": {"kind": "tool", "callId": "chatcmpl-tool-ae7ee6f3ddfbc123"}, "content": [{"type": "tool-result", "toolCallId": "chatcmpl-tool-ae7ee6f3ddfbc123", "content": [{"type": "text", "text": "hello-from-dsh-tool\n"}], "isError": false}], "role": "user", "id": "d3c1f036-ad6a-4881-adc1-641cf736a0db"}}, "sourceEventSeqs": [15], "surfaceOp": "append"}}
+[12891.604] session.event step/end {"sessionId": "probe-002-tool", "event": {"type": "step/end", "seq": 17, "time": 1789043158583, "data": {"turn": 1, "step": 1}}}
+[12891.627] session.event step/start {"sessionId": "probe-002-tool", "event": {"type": "step/start", "seq": 18, "time": 1789043158606, "data": {"turn": 1, "step": 2}}}
+[12893.407] session.event assistant/message {"sessionId": "probe-002-tool", "event": {"type": "assistant/message", "seq": 19, "time": 1789043160385, "data": {"turn": 1, "step": 2, "message": {"role": "ass
+    -> assistant/message #2, 78 chars: '\n\nDone. The command ran successfully and printed:\n\n```\nhello-from-dsh-tool\n```'
+[12893.408] session.event step/end {"sessionId": "probe-002-tool", "event": {"type": "step/end", "seq": 20, "time": 1789043160387, "data": {"turn": 1, "step": 2}}}
+[12893.410] session.event turn/end {"sessionId": "probe-002-tool", "event": {"type": "turn/end", "seq": 21, "time": 1789043160389, "data": {"turn": 1, "reason": {"kind": "completed"}}}}
+[12893.413] session.status  {"sessionId": "probe-002-tool", "status": "idle"}
+
+=== notification method counts ===
+  session.event: 19
+  session.status: 2
+
+assistant/message events: 2
+  #1 (0 chars): ''
+  #2 (78 chars): '\n\nDone. The command ran successfully and printed:\n\n```\nhello-from-dsh-tool\n```'
+
+final_response (78 chars): '\n\nDone. The command ran successfully and printed:\n\n```\nhello-from-dsh-tool\n```'
+finish_reason: completed

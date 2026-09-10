@@ -1,0 +1,29 @@
+$ bash run_probe.sh
+dsh_home=/home/bertie/Documents/projects/dsh-tui/investigation/probe/dsh-home
+[12593.303] session.event  {"sessionId": "probe-001", "event": {"type": "agent/inbox/spliced", "seq": 3, "time": 1789042860275, "data": {"target": "next-turn", "start": 0, "inserted": [{"
+[12593.303] session.status  {"sessionId": "probe-001", "status": "running"}
+[12593.303] session.event  {"sessionId": "probe-001", "event": {"type": "turn/start", "seq": 4, "time": 1789042860276, "data": {"turn": 1}}}
+[12593.303] session.event  {"sessionId": "probe-001", "event": {"type": "agent/inbox/spliced", "seq": 5, "time": 1789042860277, "data": {"target": "next-turn", "start": 0, "removedCount":
+[12593.554] session.event  {"sessionId": "probe-001", "event": {"type": "step/start", "seq": 6, "time": 1789042860534, "data": {"turn": 1, "step": 1}}}
+[12593.557] session.event  {"sessionId": "probe-001", "event": {"type": "system/message", "seq": 7, "time": 1789042860536, "data": {"turn": 1, "step": 1, "message": {"role": "system", "co
+[12593.559] session.event  {"sessionId": "probe-001", "event": {"type": "user/message", "seq": 8, "time": 1789042860537, "data": {"content": [{"type": "text", "text": "Count from 1 to 10,
+[12593.560] session.event  {"sessionId": "probe-001", "event": {"type": "user/message", "seq": 9, "time": 1789042860539, "data": {"content": [{"type": "text", "text": "Current runtime con
+[12593.561] session.event  {"sessionId": "probe-001", "event": {"type": "user/message", "seq": 10, "time": 1789042860539, "data": {"content": [{"type": "text", "text": "<system-reminder>\
+[12593.563] session.event  {"sessionId": "probe-001", "event": {"type": "request/header", "seq": 11, "time": 1789042860542, "data": {"header": {"config": {"provider": "onit", "model": "Qw
+[12593.564] session.event  {"sessionId": "probe-001", "event": {"type": "request/context", "seq": 12, "time": 1789042860543, "data": {"provider": "onit", "model": "Qwen/Qwen3.8-27B", "con
+[12593.567] session.event  {"sessionId": "probe-001", "event": {"type": "session/title", "seq": 13, "time": 1789042860546, "data": {"title": "Count from 1 to 10,", "messageSeqs": [8], "so
+[12595.928] session.event  {"sessionId": "probe-001", "event": {"type": "assistant/message", "seq": 14, "time": 1789042862906, "data": {"turn": 1, "step": 1, "message": {"role": "assistan
+    -> assistant/message #1, 22 chars: '\n\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+[12595.929] session.event  {"sessionId": "probe-001", "event": {"type": "step/end", "seq": 15, "time": 1789042862908, "data": {"turn": 1, "step": 1}}}
+[12595.930] session.event  {"sessionId": "probe-001", "event": {"type": "turn/end", "seq": 16, "time": 1789042862910, "data": {"turn": 1, "reason": {"kind": "completed"}}}}
+[12595.934] session.status  {"sessionId": "probe-001", "status": "idle"}
+
+=== notification method counts ===
+  session.event: 14
+  session.status: 2
+
+assistant/message events: 1
+  #1 (22 chars): '\n\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+
+final_response (22 chars): '\n\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+finish_reason: completed

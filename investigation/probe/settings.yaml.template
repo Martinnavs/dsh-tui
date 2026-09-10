@@ -1,0 +1,15 @@
+# Template for the isolated probe DSH_HOME's settings.yaml. The launcher
+# script substitutes __ONIT_BASE_URL__ with the real host from
+# ~/.secrets/onit/host_address.txt at run time -- this file never holds the
+# literal value, and neither does the agent that wrote it.
+llm-pi-ai:
+  providers:
+    onit:
+      apiKeyEnv: ONIT_API_KEY
+      api: openai-completions
+      baseURL: __ONIT_BASE_URL__
+      compat:
+        supportsDeveloperRole: false
+        maxTokensField: max_tokens
+      models:
+        - id: Qwen/Qwen3.8-27B
