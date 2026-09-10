@@ -47,3 +47,24 @@ no — pure rendering, touches no credentials.
 `dsh_tui/chat_ui.py` is the shared-infrastructure file Task 3 depends on (its driver calls this class's methods). See `/home/bertie/Documents/projects/dsh-tui/investigation/NOTES.md` "Established facts" section for the full cross-referenced `ChatUI` method contract used by onit's own turn loop.
 
 ## Execution Log
+
+### 2026-09-10 — developer
+Ported `/home/bertie/Documents/projects/onit/src/ui/text.py` to `/home/bertie/Documents/projects/dsh-tui/dsh_tui/chat_ui.py` near-verbatim (1644 → 1676 lines; `diff` confirms the only deltas are the two mandated changes plus the header/notice). Also created `dsh_tui/__init__.py` (empty) as minimal scaffolding so the package imports; no other files touched.
+
+Changes made:
+1. Kept the Apache-2.0 header verbatim and added an adaptation notice directly below it (lines 15–23) naming `onit/src/ui/text.py`, the upstream repo `sibyl-oracles/onit`, and the two changes below.
+2. `stream_end()`'s unconditional `from src.model.serving.chat import decode_rate` (old line 1060) is removed. Replaced with a new `_decode_rate()` method that inlines onit's own `decode_rate(m)` logic (`tokens = m.get("completion_tokens") or 0; seconds = m.get("decode_s") or 0.0; return tokens/seconds if both > 0 else 0.0`) reading directly from `self._metrics`. Returns `0.0` when `set_metrics()` was never called, so `format_meta` omits the tok/s segment — matches upstream behavior exactly (verified: with `set_metrics` + `completion_tokens=100, decode_s=5.0`, footer prints `20.0 tok/s`; without it, no rate is shown and no exception is raised).
+3. Hoisted the three identical hardcoded `"OnIt may produce inaccurate information..."` strings (old lines 1133, 1544, 1554) into a new constructor-supplied `disclaimer: str` parameter, defaulting to `"dsh may produce inaccurate information. Verify important details independently."`. All three call sites now read `self.disclaimer`. Left `agent_cursor="OnIt"` / `banner_title="OnIt Chat Interface"` (constructor defaults) untouched per the ticket's explicit instruction.
+4. Two incidental comments/docstrings mentioning `onit.py` (unrelated to the two mandated changes — one in `verification_end`, one in `stream_end`'s docstring) were genericized ("the caller" instead of "onit.py") because the ticket's Must-Verify grep requires `grep -in "onit" dsh_tui/chat_ui.py` to return only the attribution notice and the two constructor defaults; left as originally written they would have added two more unrelated hits. No logic changed, only the wording of two comments.
+
+No methods pruned or renamed; no other rendering/behavior changes.
+
+Verification run (via `uv run --with rich python3 -c ...` since no venv existed for the empty package yet — ephemeral, not persisted to the repo):
+- `grep -n "from src\.\|import src\." dsh_tui/chat_ui.py` → empty. PASS
+- `grep -in "onit" dsh_tui/chat_ui.py` → only lines 16/18/20/21 (attribution notice) and 87/94/112 (the two constructor defaults + their docstring line). PASS
+- `python3 -m py_compile dsh_tui/chat_ui.py` → OK
+- `ChatUI(agent_cursor='dsh', banner_title='dsh Chat').render()` → ran cleanly, printed banner + dsh disclaimer, no exception. PASS
+- `stream_start()` → `stream_token('hello')` → `stream_end()` → printed a complete streamed block (header, token, footer with elapsed) with no exception, no `ModuleNotFoundError`. PASS
+- Same sequence with `set_metrics()` wired to a sink with `completion_tokens=100, decode_s=5.0` → footer printed `20.0 tok/s`, confirming `_decode_rate()` matches upstream `decode_rate()` arithmetic.
+
+Status: DONE. All four acceptance criteria met.

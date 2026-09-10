@@ -1,0 +1,250 @@
+
+It ran cleanly (exit code 0).
+└────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Showing last 6 of 6 messages
+                                                                      dsh may produce inaccurate information. Verify important details independently.
+
+➤ What is my favourite colour? Answer in one short sentence.
+╭─ 🔧 Execution Logs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No execution logs yet.                                                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 💬 Chat History ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ 👤 You [09:06 PM 10 Sep]
+My favourite colour is teal.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Noted — teal. Good choice: it reads well on dark TUI backgrounds. If you'd like, I can use it as the default accent color in the TUI, or I'll just keep it in mind for future themes.
+└────────────────────────────────────────
+┌─ 👤 You [09:06 PM 10 Sep]
+Run this exact bash command and show me its output: echo hello-from-dsh-tui-live
+└────────────────────────────────────────
+┌─ ⚙️  bash [09:06 PM 10 Sep]
+{"command": "echo hello-from-dsh-tui-live", "description": "Echo the test string"}
+└────────────────────────────────────────
+┌─ ↩  bash [09:06 PM 10 Sep]
+hello-from-dsh-tui-live
+
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Output:
+
+```
+hello-from-dsh-tui-live
+```
+
+It ran cleanly (exit code 0).
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+What is my favourite colour? Answer in one short sentence.
+└────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Showing last 7 of 7 messages
+                                                                      dsh may produce inaccurate information. Verify important details independently.
+
+┌─ 🤖 AI [09:07 PM 10 Sep]
+Your favourite colour is teal.
+└────────────────────────────────────────  0.00s
+╭─ 🔧 Execution Logs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No execution logs yet.                                                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 💬 Chat History ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ 👤 You [09:06 PM 10 Sep]
+My favourite colour is teal.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Noted — teal. Good choice: it reads well on dark TUI backgrounds. If you'd like, I can use it as the default accent color in the TUI, or I'll just keep it in mind for future themes.
+└────────────────────────────────────────
+┌─ 👤 You [09:06 PM 10 Sep]
+Run this exact bash command and show me its output: echo hello-from-dsh-tui-live
+└────────────────────────────────────────
+┌─ ⚙️  bash [09:06 PM 10 Sep]
+{"command": "echo hello-from-dsh-tui-live", "description": "Echo the test string"}
+└────────────────────────────────────────
+┌─ ↩  bash [09:06 PM 10 Sep]
+hello-from-dsh-tui-live
+
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Output:
+
+```
+hello-from-dsh-tui-live
+```
+
+It ran cleanly (exit code 0).
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+What is my favourite colour? Answer in one short sentence.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:07 PM 10 Sep]
+Your favourite colour is teal.
+└────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Showing last 8 of 8 messages
+                                                                      dsh may produce inaccurate information. Verify important details independently.
+
+➤ Write a detailed 5-paragraph essay about the history of teal as a color, covering etymology, use in textiles, use in design, and psychology of the color. Be thorough.
+╭─ 🔧 Execution Logs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No execution logs yet.                                                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 💬 Chat History ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ 👤 You [09:06 PM 10 Sep]
+My favourite colour is teal.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Noted — teal. Good choice: it reads well on dark TUI backgrounds. If you'd like, I can use it as the default accent color in the TUI, or I'll just keep it in mind for future themes.
+└────────────────────────────────────────
+┌─ 👤 You [09:06 PM 10 Sep]
+Run this exact bash command and show me its output: echo hello-from-dsh-tui-live
+└────────────────────────────────────────
+┌─ ⚙️  bash [09:06 PM 10 Sep]
+{"command": "echo hello-from-dsh-tui-live", "description": "Echo the test string"}
+└────────────────────────────────────────
+┌─ ↩  bash [09:06 PM 10 Sep]
+hello-from-dsh-tui-live
+
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Output:
+
+```
+hello-from-dsh-tui-live
+```
+
+It ran cleanly (exit code 0).
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+What is my favourite colour? Answer in one short sentence.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:07 PM 10 Sep]
+Your favourite colour is teal.
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+Write a detailed 5-paragraph essay about the history of teal as a color, covering etymology, use in textiles, use in design, and psychology of the color. Be thorough.
+└────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Showing last 9 of 9 messages
+                                                                      dsh may produce inaccurate information. Verify important details independently.
+
+┌─ 🤖 AI [09:07 PM 10 Sep]
+# The Long Blue-Green: A History of Teal
+
+The word "teal" arrived in English not as a hue at all, but as a bird. First recorded around the mid-seventeenth century, it referred to the Eurasian teal (*Anas crecca*), a small dabbling duck whose plumage carries a di
+stinctive blue-green sheen, and the name itself is thought to derive from Old French *tassan* or a similar root meaning "stout" or "heavy," a fitting descriptor for the bird's compact build. The colour meaning emerged fr
+om the bird's feathers, and by the eighteenth century "teal" was being applied to a dark greenish-blue, though English colour language of the period was notoriously loose — writers would call the same shade "verditer," "
+glance," "sea-green," or "prussian" interchangeably. What is striking is that teal never had a fixed position on the colour wheel: unlike red or yellow, it sat in the ambiguous borderland between green and blue, which is
+ precisely why a single word for it took centuries to stabilise, and why the modern swatch we now associate with it — something like a deep, muted cyan, #008080 in the earliest digital palettes — is a retrospective compr
+omise rather than a historically pure standard.
+
+In textiles, teal's history is inseparable from the chemistry of dyes. Before industrial pigments, a true teal could not be obtained from a single natural source; clothworkers produced it by over-dyeing — most commonly l
+ayering a yellow mordant or weld/yellow-dye bath over indigo, or combining indigo with weld — a process that made the colour expensive and unpredictable, prone to shifting toward blue or green with each batch. This diffi
+culty paradoxically made teal a marker of sophistication in dress: the deep greenish blues and blues of the peacock, the jay, and the kingfisher, rendered in costly over-dyed silk and wool, signalled that a garment's mak
+er could master a two-step process. In the nineteenth century, the invention of synthetic aniline dyes in the 1850s and 1860s transformed the story. Saffronin and its relatives gave dyers direct, fast, reproducible teal-
+ish tones for the first time, and the colour flooded the fashion world, the upholstery trade, and the uniform makers of empires — the "teal" of naval and colonial officer's dress, and of Indian chintz and block-printed c
+otton, became a visual signature of the late Victorian age, appearing everywhere from drawing-room draperies to the lining of a gentleman's coat.
+
+Design, once it industrialised, took teal as a kind of shorthand for a particular mood: the colour of the sea at dusk, of oxidised copper, of deep water, and therefore of calm, expertise, and quiet confidence. In the twe
+ntieth century it became a workhorse of both corporate and domestic design. Interior designers of the mid-century modern movement paired teal cabinetry and walls with teak, brass, and off-white, treating it as a sophisti
+cated alternative to the browns and beiges of the fifties; it appeared in everything from the enamel of kitchen appliances to the vinyl of record sleeves. In graphic design, the digital palette of 1987 and the early 1990
+s locked "teal" into computer culture as a specific dark cyan, and the colour's association with clarity — think of medical and aquatic iconography, of "safe" interface elements — carried it into branding, where it now s
+ignals health, technology, and finance. Even in aviation and maritime livery, teal has persisted as a favourite because it photographs and paints evenly at distance, a practical advantage that quietly reinforced its pres
+tige.
+
+The psychology of teal follows almost directly from this layered history. Colour-psychology research and marketing practice consistently associate teal with balance: it inherits green's link to nature, growth, and recove
+ry, and blue's associations with calm, trust, and depth, yet belongs decisively to neither. This hybridity is what makes it feel "sober" and restful — studies on colour and mood find blue-green tones reduce perceived str
+ess more reliably than saturated reds or yellows, which is why hospitals, spas, and wellness brands gravitate toward it, and why it features so heavily in environments designed for concentration or healing. There is a co
+untervailing note, though: in certain cultural and lighting contexts, a poorly warmed teal can read as cold, institutional, or even funereal, and colour theorists warn that its effect is heavily moderated by surrounding
+neutrals. In East Asian traditions, where the green-blue borderland has its own symbolic vocabulary, the same hue has carried meanings of purity and renewal rather than sterility — a reminder that teal's psychology is cu
+lturally composed, not universal.
+
+What makes teal's history worth retracing is that it is a portrait of how colour categories are invented. A word born from a duck, a shade assembled from two dyes, a swatch fixed by a computer palette, and a mood calibra
+ted by marketing departments: at each stage, teal was less a discovery than a negotiation. That it is nonetheless among the most beloved and durable colours in the modern vocabulary — one that people, in fact, cite as a
+favourite — suggests it landed on something real. The borderland between green and blue is where the sky meets the sea, and a colour that names exactly that meeting point has, perhaps, an inevitable future in design, and
+ a good place in the hearts of the people who live by it.
+└────────────────────────────────────────  0.00s
+╭─ 🔧 Execution Logs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No execution logs yet.                                                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 💬 Chat History ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ 👤 You [09:06 PM 10 Sep]
+My favourite colour is teal.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Noted — teal. Good choice: it reads well on dark TUI backgrounds. If you'd like, I can use it as the default accent color in the TUI, or I'll just keep it in mind for future themes.
+└────────────────────────────────────────
+┌─ 👤 You [09:06 PM 10 Sep]
+Run this exact bash command and show me its output: echo hello-from-dsh-tui-live
+└────────────────────────────────────────
+┌─ ⚙️  bash [09:06 PM 10 Sep]
+{"command": "echo hello-from-dsh-tui-live", "description": "Echo the test string"}
+└────────────────────────────────────────
+┌─ ↩  bash [09:06 PM 10 Sep]
+hello-from-dsh-tui-live
+
+└────────────────────────────────────────
+┌─ 🤖 AI [09:06 PM 10 Sep]
+Output:
+
+```
+hello-from-dsh-tui-live
+```
+
+It ran cleanly (exit code 0).
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+What is my favourite colour? Answer in one short sentence.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:07 PM 10 Sep]
+Your favourite colour is teal.
+└────────────────────────────────────────
+┌─ 👤 You [09:07 PM 10 Sep]
+Write a detailed 5-paragraph essay about the history of teal as a color, covering etymology, use in textiles, use in design, and psychology of the color. Be thorough.
+└────────────────────────────────────────
+┌─ 🤖 AI [09:07 PM 10 Sep]
+# The Long Blue-Green: A History of Teal
+
+The word "teal" arrived in English not as a hue at all, but as a bird. First recorded around the mid-seventeenth century, it referred to the Eurasian teal (*Anas crecca*), a small dabbling duck whose plumage carries a
+distinctive blue-green sheen, and the name itself is thought to derive from Old French *tassan* or a similar root meaning "stout" or "heavy," a fitting descriptor for the bird's compact build. The colour meaning emerged
+from the bird's feathers, and by the eighteenth century "teal" was being applied to a dark greenish-blue, though English colour language of the period was notoriously loose — writers would call the same shade "verditer,"
+"glance," "sea-green," or "prussian" interchangeably. What is striking is that teal never had a fixed position on the colour wheel: unlike red or yellow, it sat in the ambiguous borderland between green and blue, which
+is precisely why a single word for it took centuries to stabilise, and why the modern swatch we now associate with it — something like a deep, muted cyan, #008080 in the earliest digital palettes — is a retrospective
+compromise rather than a historically pure standard.
+
+In textiles, teal's history is inseparable from the chemistry of dyes. Before industrial pigments, a true teal could not be obtained from a single natural source; clothworkers produced it by over-dyeing — most commonly
+layering a yellow mordant or weld/yellow-dye bath over indigo, or combining indigo with weld — a process that made the colour expensive and unpredictable, prone to shifting toward blue or green with each batch. This
+difficulty paradoxically made teal a marker of sophistication in dress: the deep greenish blues and blues of the peacock, the jay, and the kingfisher, rendered in costly over-dyed silk and wool, signalled that a
+garment's maker could master a two-step process. In the nineteenth century, the invention of synthetic aniline dyes in the 1850s and 1860s transformed the story. Saffronin and its relatives gave dyers direct, fast,
+reproducible teal-ish tones for the first time, and the colour flooded the fashion world, the upholstery trade, and the uniform makers of empires — the "teal" of naval and colonial officer's dress, and of Indian chintz
+and block-printed cotton, became a visual signature of the late Victorian age, appearing everywhere from drawing-room draperies to the lining of a gentleman's coat.
+
+Design, once it industrialised, took teal as a kind of shorthand for a particular mood: the colour of the sea at dusk, of oxidised copper, of deep water, and therefore of calm, expertise, and quiet confidence. In the
+twentieth century it became a workhorse of both corporate and domestic design. Interior designers of the mid-century modern movement paired teal cabinetry and walls with teak, brass, and off-white, treating it as a
+sophisticated alternative to the browns and beiges of the fifties; it appeared in everything from the enamel of kitchen appliances to the vinyl of record sleeves. In graphic design, the digital palette of 1987 and the
+early 1990s locked "teal" into computer culture as a specific dark cyan, and the colour's association with clarity — think of medical and aquatic iconography, of "safe" interface elements — carried it into branding,
+where it now signals health, technology, and finance. Even in aviation and maritime livery, teal has persisted as a favourite because it photographs and paints evenly at distance, a practical advantage that quietly
+reinforced its prestige.
+
+The psychology of teal follows almost directly from this layered history. Colour-psychology research and marketing practice consistently associate teal with balance: it inherits green's link to nature, growth, and
+recovery, and blue's associations with calm, trust, and depth, yet belongs decisively to neither. This hybridity is what makes it feel "sober" and restful — studies on colour and mood find blue-green tones reduce
+perceived stress more reliably than saturated reds or yellows, which is why hospitals, spas, and wellness brands gravitate toward it, and why it features so heavily in environments designed for concentration or healing.
+There is a countervailing note, though: in certain cultural and lighting contexts, a poorly warmed teal can read as cold, institutional, or even funereal, and colour theorists warn that its effect is heavily moderated by
+surrounding neutrals. In East Asian traditions, where the green-blue borderland has its own symbolic vocabulary, the same hue has carried meanings of purity and renewal rather than sterility — a reminder that teal's
+psychology is culturally composed, not universal.
+
+What makes teal's history worth retracing is that it is a portrait of how colour categories are invented. A word born from a duck, a shade assembled from two dyes, a swatch fixed by a computer palette, and a mood
+calibrated by marketing departments: at each stage, teal was less a discovery than a negotiation. That it is nonetheless among the most beloved and durable colours in the modern vocabulary — one that people, in fact,
+cite as a favourite — suggests it landed on something real. The borderland between green and blue is where the sky meets the sea, and a colour that names exactly that meeting point has, perhaps, an inevitable future in
+design, and a good place in the hearts of the people who live by it.
+└────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Showing last 10 of 10 messages
+                                                                      dsh may produce inaccurate information. Verify important details independently.
+
+➤
+___EXIT:0
+

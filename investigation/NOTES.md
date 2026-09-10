@@ -138,6 +138,55 @@ without further work: spinner while the turn runs, then the full answer
 lands at once. Everything else — tool-call/tool-result blocks, message
 history, input handling — maps cleanly.
 
+**Probe 3 — 2026-09-10, same live onit/vLLM Qwen endpoint, extends
+Probes 1–2.** One process (`probe/multiturn_probe.py` +
+`probe/run_probe3.sh`, same isolated `DSH_HOME`, same secret discipline —
+launcher shell script sources `~/.secrets/onit/*` into env, Python reads
+only `os.environ`, value never read/printed by the agent) closing the
+three remaining unknowns below. Full raw notification stream saved in
+`probe/probe-output-3-multiturn.txt`.
+
+- **(a) Same-`Session`, second `.run()` carries first turn's context: YES
+  — confirmed, unambiguous.** Held one `Session` (`harness.start_session(id)`)
+  across two `.run()` calls: turn 1 "My favourite colour is teal.", turn 2
+  "What is my favourite colour?". Turn 2's `assistant/message` answered
+  "Teal — you told me in your first message." (`probe-output-3-multiturn.txt`
+  line ~29) and its own `reasoning` block states *"I stated it a moment
+  ago: teal."* — the model saw turn 1's content, not just structurally but
+  demonstrably read it. **This gates Task 4 and it is positive: no
+  escalation needed, the MVP's planned turn loop (one held `Session`,
+  repeated `.run()`) works as assumed.**
+
+- **(b) Multi-paragraph prompt → still exactly one `assistant/message`
+  event.** A four-paragraph, ~1100-char answer (prompt: four short
+  paragraphs on the four seasons) arrived as **one** `assistant/message`
+  event carrying the complete 1164-char text — same shape as the 22-char
+  and 78-char answers in Probes 1–2. No length-triggered chunking exists
+  up to ~1.2k chars of output; this closes the "undocumented delta channel
+  wasn't triggered" unknown from Probes 1–2 with a materially longer
+  sample.
+
+- **(c) Reasoning arrives as a distinct `content` block inside the same
+  `assistant/message` event — not a separate `event.type`, not
+  `<think>`-wrapped text.** Every `assistant/message` across all four
+  turns probed (both turns of phase A, plus B and C) carried
+  `data.message.content == [{"type": "reasoning", "text": "..."}, {"type":
+  "text", "text": "..."}]` unconditionally — this model reasons by default
+  on this backend, no `reasoning_effort` override needed (setting
+  `reasoning_effort="high"` explicitly errored: `JsonRpcError: provider
+  "onit" model "Qwen/Qwen3.8-27B" does not support reasoning effort
+  "high"` — left at the SDK default thereafter). Confirmed no distinct
+  reasoning `event.type` exists: the reasoning-eliciting turn's full set
+  of `event.type` values was `['agent/inbox/spliced', 'assistant/message',
+  'request/context', 'request/header', 'session/title', 'step/end',
+  'step/start', 'system/message', 'turn/end', 'turn/start',
+  'user/message']` — no `reasoning/*` type. Confirmed no `<think>` tag
+  substring anywhere in `final_response` or any `assistant/message` text.
+  **Practical consequence for `ChatUI.stream_think_token()`:** drive it
+  from the `reasoning`-typed content block within the same
+  `assistant/message` event (present unconditionally on this backend),
+  not from a separate notification type or client-side tag parsing.
+
 ## Symbols (pointers, not full reads needed downstream)
 
 - `../onit/src/ui/text.py` — `ChatUI` class, to port near-verbatim.
@@ -156,32 +205,27 @@ history, input handling — maps cleanly.
 
 ## Remaining unknowns (must-verify before/while building)
 
-- **Reasoning/thinking stream.** The original curl response carried a
-  separate `reasoning` field; neither probe elicited visible reasoning
-  (prompts were too simple / model may not have reasoned). Whether
-  reasoning arrives as its own event type (needed to drive
-  `stream_think_token`) is unconfirmed — needs a probe with a
-  reasoning-eliciting prompt and `reasoning_effort` set.
-  Alternative if it doesn't cleanly break out: check the encoded prompt
-  wrapping the model's output for something like `<think>` tags, which
-  `ChatUI`/`chat.py` already parse client-side (`_filter_display_token`,
-  `<answer>`/`<think>` stripping) — dsh may hand back a similarly-wrapped
-  single string rather than a separate channel.
+- ~~**Reasoning/thinking stream.**~~ **Resolved by Probe 3 (c):** reasoning
+  arrives as a `{"type": "reasoning", ...}` content block inside the same
+  `assistant/message` event, unconditionally, no `reasoning_effort` needed
+  on this backend. No separate event type, no `<think>` tags. See Probe 3
+  above.
 - **Session resume across process restarts.** onit defaults to resuming
   the last session on bare `onit`. Whether reusing a `session_id` across
   separate `DeepSeekHarness` launches (not just within one live process)
   replays durable history the same way is unconfirmed from the SDK docs
-  alone.
+  alone. (Probe 3 only held one `Session` within one live process/harness
+  — cross-process resume is still untested.)
 - **Interrupt/Ctrl+C mid-turn.** `ChatUI.get_user_input` raises
   `KeyboardInterrupt`/`EOFError` to stop the loop; onit's `chat()` has its
   own mid-generation stop handling. The SDK-side equivalent (does
   `session_prompt` support cancellation, or does the caller just stop
   reading notifications and leave the run orphaned server-side?) is
   unconfirmed.
-- **Whether an undocumented delta channel exists but wasn't triggered.**
-  Two short-answer probes is decent but not exhaustive evidence. A
-  longer-output probe (several paragraphs) would make length-based
-  chunking show up if it exists and wasn't visible at 22–78 chars.
+- ~~**Whether an undocumented delta channel exists but wasn't triggered.**~~
+  **Resolved by Probe 3 (b):** a ~1164-char, four-paragraph answer still
+  arrived as exactly one `assistant/message` event — no length-triggered
+  chunking up to that size. See Probe 3 above.
 
 ## Risks
 

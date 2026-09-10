@@ -1,0 +1,12 @@
+# Runtime dependencies for dsh-tui.
+#
+# Installed automatically by scripts/run-dsh-tui.sh into
+# investigation/probe/.venv on first run (see R3-3 in
+# .scratch/dsh-tui-mvp/tickets/04-entry-point-config-docs.md) -- there is
+# no need to install these by hand for normal use.
+#
+# Versions pin to what has been proven end to end against the live
+# onit/Qwen vLLM endpoint (investigation/NOTES.md, task4 live-run
+# transcript); bump deliberately, not incidentally.
+deepseek-harness-sdk>=0.1.5rc1
+rich>=15.0.0

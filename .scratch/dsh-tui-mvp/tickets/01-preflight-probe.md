@@ -49,3 +49,57 @@ yes — touches the live endpoint and the API key. Same discipline as the existi
 See `/home/bertie/Documents/projects/dsh-tui/investigation/NOTES.md` for the investigation record this probe extends, and `investigation/PLAN-DRAFT.md`/`PLAN.md` for how finding (a) gates Task 4.
 
 ## Execution Log
+
+### 2026-09-10 — developer
+
+Status: DONE
+
+Built `investigation/probe/multiturn_probe.py` extending
+`notification_probe.py`'s pattern (same isolated `DSH_HOME`, same secret
+discipline), plus a launcher `investigation/probe/run_probe3.sh` following
+`run_probe.sh`'s exact pattern (shell script sources
+`~/.secrets/onit/{host_address,api_key}.txt` into env vars in its own
+process only; Python reads only `os.environ`; secret values never read or
+printed by the agent) — `run_probe3.sh` is a small addition beyond the
+ticket's literal Files list, required by the non-negotiable security
+constraint since `run_probe.sh` is hardcoded to `notification_probe.py`
+and can't be reused as-is for a different entry-point script.
+
+Ran it live twice against the real onit/vLLM Qwen endpoint (not
+simulated). First run: phase A and B captured cleanly, phase C errored
+(`reasoning_effort="high"` unsupported by this provider/model) —
+fixed by dropping that override, since phases A/B already showed
+reasoning content blocks appear unconditionally. Second attempt hit a
+`session "...already exists"` JsonRpcError because the probe's dsh_home
+persists sessions across runs and the first (partial) run had already
+created those session ids — fixed by suffixing session ids with a
+per-run `uuid4` hex. Third run: clean, exit 0, all three phases captured.
+Raw output: `investigation/probe/probe-output-3-multiturn.txt`.
+
+Verdicts:
+- (a) POSITIVE — same-`Session` second `.run()` carries first turn's
+  context (turn 2 answered "Teal — you told me in your first message.").
+  Task 4 is NOT blocked; no escalation needed.
+- (b) One `assistant/message` event for a ~1164-char four-paragraph
+  answer — no length-triggered chunking found.
+- (c) Reasoning arrives as a `{"type": "reasoning", ...}` content block
+  inside the same `assistant/message` event, present unconditionally on
+  this backend (no `reasoning_effort` override needed) — not a separate
+  `event.type`, not `<think>`-wrapped text.
+
+Appended a new dated "Probe 3" subsection to `investigation/NOTES.md`
+under "Probes" in the established-fact style, and updated "Remaining
+unknowns" to cross out/resolve the reasoning-stream and chunking
+unknowns (session-resume-across-restarts and interrupt/Ctrl+C remain
+open, out of this ticket's scope).
+
+Acceptance criteria: all three met — (a)/(b)/(c) answered with raw output
+saved, NOTES.md updated with verdicts, and (a) came back positive so no
+escalation was required (reported anyway per the ticket's instruction to
+state the verdict explicitly).
+
+Files touched: `investigation/probe/multiturn_probe.py` (new),
+`investigation/probe/run_probe3.sh` (new, not in original Files list —
+see justification above), `investigation/probe/probe-output-3-multiturn.txt`
+(new, raw captured output), `investigation/NOTES.md` (append-only, new
+Probe 3 subsection + unknowns list update), this ticket (Execution Log).
