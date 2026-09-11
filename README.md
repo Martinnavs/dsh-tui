@@ -42,6 +42,22 @@ DSH_TUI_PROVIDER=onit DSH_TUI_MODEL=Qwen/Qwen3.8-27B scripts/run-dsh-tui.sh
 Type at the `➤` prompt and press Enter to send a turn. Type `\bye`, or
 press Ctrl+C / Ctrl+D, to exit.
 
+### Scrolling the chat history
+
+While typing at the `➤` prompt, these keys move the visible window over
+the chat history instead of being inserted into the input line:
+
+- **PgUp** or **Ctrl+U** — scroll back (older messages)
+- **PgDn** or **Ctrl+F** — scroll forward (newer messages)
+- **Home** — jump to the oldest message
+- **End** — jump to the newest message
+
+The footer under the chat panel always shows the visible range and the
+total message count (e.g. `Showing 12-26 of 140 messages`). Once you've
+scrolled back from the bottom it also says so and names the key that
+returns you to the latest messages (`— scrolled, End to jump to
+latest`).
+
 ## Known limitations
 
 - **No live token streaming.** The answer lands complete, not
@@ -61,6 +77,15 @@ press Ctrl+C / Ctrl+D, to exit.
   is called once per process and a fresh session id is generated per run;
   closing and reopening the client starts a new conversation with no
   history from the previous run.
+- **Scrolling is message-granular, not line-granular.** The v1 scrollback
+  window (`ChatUI._visible_messages()`) counts messages, not terminal
+  lines — nothing in the render path consults terminal size, so a single
+  message taller than the terminal still overflows the visible area.
+- **Chat history is capped at `max_messages` (1000).** Raised in
+  `dsh_tui/cli.py` from `ChatUI`'s original default of 100 specifically
+  so the new scroll feature has meaningful depth to reach — the old
+  default would have capped scrollback at roughly 25 tool-using turns
+  (each turn appends 2+ messages with `show_logs=True`).
 
 ## Growth table — capability-driven, not calendar-driven
 
@@ -82,6 +107,8 @@ answer first and are called out honestly rather than implied to be free.
 | You want history to survive a restart | Probe whether reusing a `session_id` across `DeepSeekHarness` launches replays durable history, then pass it through the CLI | `api.py:120` `start_session` |
 | You want a debugging view of every event | Construct `ChatUI(show_logs=True)` and call `add_log` from the driver's ignore-branch | `chat_ui.py:277`, `:319` |
 | You want a second provider/model | Add template variables to `settings.yaml.template` — the schema is already shared across every dsh surface | `dsh_tui/settings.yaml.template` |
+| ⚠ Message-granular scrolling isn't enough (a single message overflows the terminal) | Deferred v1 scope decision — current windowing (`_visible_messages`) scrolls by message count, not by terminal lines. Needs the render path to consult terminal height per message before it can jump straight to a line offset | `chat_ui.py:210-261` `_visible_messages`, `_max_scroll_offset` |
+| ⚠ You want mouse-wheel scrolling | Deferred by explicit user request this session (keyboard scrolling was tested first in tmux; mouse support was left for a separate pass if needed). This user's tmux config has `mouse off` globally, so wheel events wouldn't reach the app without also changing that tmux setting — implementing it needs xterm SGR mouse-reporting protocol support added to the raw-byte input loop, a comparable-sized addition to the keyboard bindings that just shipped, not a trivial one | `chat_ui.py:1428` `_input_with_history_unix` |
 
 Nothing in that table is a second implementation to reconcile with the
 first. That is the payoff of porting `ChatUI` whole in Task 2 instead of

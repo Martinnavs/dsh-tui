@@ -75,6 +75,10 @@ def main() -> None:
         # chat_ui.py), so this is required for acceptance criterion 3
         # (tool calls render inline, never invisibly) -- not optional.
         show_logs=True,
+        # Default max_messages=100 caps scrollback at ~25 tool-using turns
+        # (each appends 2+ messages with show_logs=True); raise it so the
+        # scroll feature can reach further back into history.
+        max_messages=1000,
     )
     driver = make_driver(chat_ui)
 

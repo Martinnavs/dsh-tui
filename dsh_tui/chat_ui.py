@@ -21,6 +21,10 @@
 #   2. The hardcoded "OnIt may produce inaccurate information..."
 #      disclaimer string is now a constructor-configurable
 #      `disclaimer` attribute instead of being repeated verbatim.
+#   3. Added vim-like scrollback over the chat history (PgUp/PgDn,
+#      Ctrl+U/Ctrl+F, Home/End) with a scroll-aware footer and a
+#      raw-terminal-safe repaint path; render_messages() now renders
+#      the scrolled slice instead of always the last N messages.
 
 
 Text-based UI components for the application.
@@ -117,6 +121,8 @@ class ChatUI:
         # Use deque for bounded memory - automatically removes old messages
         self.messages = deque(maxlen=max_messages)
         self.display_messages = display_messages
+        # Messages scrolled back from the newest; 0 = bottom = today's behavior.
+        self._scroll_offset = 0
         self.agent_cursor = agent_cursor
         # Corrections from a fact-check that finished after its answer did.
         # Held rather than printed: see verification_correction().
@@ -199,6 +205,61 @@ class ChatUI:
     def format_timestamp(self):
         return datetime.now().strftime("%I:%M %p %d %b")
 
+    # ── Scrollback ────────────────────────────────────────────────
+
+    def _max_scroll_offset(self) -> int:
+        """Furthest an offset can move back before hitting the oldest message."""
+        return max(0, len(self.messages) - self.display_messages)
+
+    def _reset_scroll(self) -> None:
+        """Snap the view back to the bottom; called whenever new content arrives."""
+        self._scroll_offset = 0
+
+    def scroll_up(self, pages: int = 1) -> bool:
+        """Move the visible window further back in history.
+
+        Returns whether the offset actually changed (False at the top).
+        """
+        max_offset = self._max_scroll_offset()
+        new_offset = min(max_offset, self._scroll_offset + pages * self.display_messages)
+        changed = new_offset != self._scroll_offset
+        self._scroll_offset = new_offset
+        return changed
+
+    def scroll_down(self, pages: int = 1) -> bool:
+        """Move the visible window toward the newest message.
+
+        Returns whether the offset actually changed (False at the bottom).
+        """
+        new_offset = max(0, self._scroll_offset - pages * self.display_messages)
+        changed = new_offset != self._scroll_offset
+        self._scroll_offset = new_offset
+        return changed
+
+    def scroll_to_top(self) -> bool:
+        """Jump to the oldest message. Returns whether the offset changed."""
+        max_offset = self._max_scroll_offset()
+        changed = max_offset != self._scroll_offset
+        self._scroll_offset = max_offset
+        return changed
+
+    def scroll_to_bottom(self) -> bool:
+        """Jump to the newest message. Returns whether the offset changed."""
+        changed = self._scroll_offset != 0
+        self._scroll_offset = 0
+        return changed
+
+    def _visible_messages(self) -> list:
+        """The slice of `self.messages` the current scroll offset shows."""
+        max_offset = self._max_scroll_offset()
+        offset = min(self._scroll_offset, max_offset)
+        msgs = list(self.messages)
+        if offset == 0:
+            return msgs[-self.display_messages:]
+        end = len(msgs) - offset
+        start = max(0, end - self.display_messages)
+        return msgs[start:end]
+
     def add_message(
         self,
         role: Literal["user", "assistant", "system"],
@@ -230,6 +291,7 @@ class ChatUI:
                 "time": self.format_timestamp(),
                 "elapsed": elapsed
             })
+        self._reset_scroll()
 
     def update_last_message(self, additional_content: str) -> None:
         """
@@ -265,6 +327,7 @@ class ChatUI:
             self.messages.extend(messages_to_keep)
         else:
             self.messages.clear()
+        self._reset_scroll()
 
     def add_tool_call(self, name: str, arguments: dict) -> None:
         """Add a tool invocation message inline in the chat history."""
@@ -276,6 +339,7 @@ class ChatUI:
             timestamp=self.format_timestamp(),
             name=name,
         ))
+        self._reset_scroll()
 
     def add_tool_result(self, name: str, result: str, truncate: int = 300) -> None:
         """Add a tool result message inline in the chat history."""
@@ -288,6 +352,7 @@ class ChatUI:
             timestamp=self.format_timestamp(),
             name=name,
         ))
+        self._reset_scroll()
 
     def add_log(
         self,
@@ -391,8 +456,7 @@ class ChatUI:
                 return self._render_welcome_panel()
 
             content = Text()
-            # Show last N messages (configurable)
-            display_msgs = list(self.messages)[-self.display_messages:]
+            display_msgs = self._visible_messages()
 
             for msg in display_msgs:
                 # Handle both Message dataclass and dict (for backward compatibility)
@@ -418,7 +482,17 @@ class ChatUI:
                 subtitle = f"📁 {self.data_path}"
                 subtitle_align = "left"
             else:
-                subtitle = f"Showing last {len(display_msgs)} of {len(self.messages)} messages"
+                total = len(self.messages)
+                offset = min(self._scroll_offset, self._max_scroll_offset())
+                if offset == 0:
+                    subtitle = f"Showing last {len(display_msgs)} of {total} messages"
+                else:
+                    end = total - offset
+                    start = max(0, end - self.display_messages) + 1
+                    subtitle = (
+                        f"Showing {start}-{end} of {total} messages "
+                        f"— scrolled, End to jump to latest"
+                    )
                 subtitle_align = "right"
 
             header = Rule("[bold white]💬 Chat History[/]", characters="━", style="blue")
@@ -1191,6 +1265,45 @@ class ChatUI:
         sys.stdout.flush()
         return len(lines)
 
+    def _repaint_with_input(
+        self,
+        fd: int,
+        prompt: str,
+        current_input: list[str],
+        cursor_pos: int,
+    ) -> tuple[int, int]:
+        """Redraw the full frame (chat panel + disclaimer) under an in-progress input line.
+
+        Called after a scroll key while `get_user_input`'s raw-mode read loop is
+        still running. Rich's prints need OPOST/ONLCR for `\\n` to render as
+        `\\r\\n` (which `tty.setraw` clears), but restoring the *full* cooked
+        termios settings to get that back — as an earlier version of this
+        function did — also re-enables ECHO/ICANON/ISIG/IXON for the print
+        window. That is a real, reproducible bug: a keystroke that arrives
+        during those ~3-5ms gets echoed as garbage into the frame being
+        painted, and a repeated Ctrl+U in particular is interpreted by the
+        line discipline as VKILL and silently destroys whatever input was
+        already queued. So only the output flags are patched onto the raw
+        attributes already in effect — input discipline (no echo, no
+        canonical processing, no signal chars, no software flow control)
+        stays exactly as raw mode left it for the whole repaint.
+        """
+        raw_attrs = termios.tcgetattr(fd)  # type: ignore[name-defined]
+        cooked_output_attrs = list(raw_attrs)
+        cooked_output_attrs[1] |= termios.OPOST | termios.ONLCR  # type: ignore[name-defined]
+        termios.tcsetattr(fd, termios.TCSADRAIN, cooked_output_attrs)  # type: ignore[name-defined]
+        self._print_frame()
+        termios.tcsetattr(fd, termios.TCSADRAIN, raw_attrs)  # type: ignore[name-defined]
+        num_display_lines = self._redraw_line(prompt, current_input, prev_lines=1)
+        if '\n' in current_input[cursor_pos:]:
+            cursor_pos = len(current_input)
+        else:
+            n = len(current_input) - cursor_pos
+            if n > 0:
+                sys.stdout.write(f'\033[{n}D')
+                sys.stdout.flush()
+        return num_display_lines, cursor_pos
+
     def _handle_arrow_keys(
         self,
         code: str,
@@ -1372,6 +1485,23 @@ class ChatUI:
                     sys.stdout.flush()
                     raise EOFError
 
+                elif char == '\x15':  # Ctrl+U — scroll up (PgUp equivalent)
+                    if self.scroll_up():
+                        num_display_lines, cursor_pos = self._repaint_with_input(
+                            fd, prompt, current_input, cursor_pos,
+                        )
+
+                elif char == '\x06':  # Ctrl+F — scroll down (PgDn equivalent)
+                    # Ctrl+B is not bound here (would mirror PgUp) because it is
+                    # the tmux prefix key and never reaches this loop under tmux.
+                    # Ctrl+D is not reused for this (would mirror PgDn) because
+                    # \x04 already raises EOFError above; rebinding it here would
+                    # shadow that existing exit binding.
+                    if self.scroll_down():
+                        num_display_lines, cursor_pos = self._repaint_with_input(
+                            fd, prompt, current_input, cursor_pos,
+                        )
+
                 elif char == '\x1b':  # Escape sequence
                     # Use select with a 50 ms timeout to distinguish a standalone
                     # ESC key from the start of a multi-byte terminal sequence.
@@ -1428,9 +1558,39 @@ class ChatUI:
                             current_input, cursor_pos = self._handle_delete_key(
                                 current_input, cursor_pos, fd,
                             )
+                        elif next2 in ('5', '6'):  # PgUp \e[5~ / PgDn \e[6~
+                            rlist, _, _ = _select.select([fd], [], [], 0.05)
+                            next3 = os.read(fd, 1).decode('utf-8', errors='replace') if rlist else ''
+                            if next3 == '~':
+                                changed = self.scroll_up() if next2 == '5' else self.scroll_down()
+                                if changed:
+                                    num_display_lines, cursor_pos = self._repaint_with_input(
+                                        fd, prompt, current_input, cursor_pos,
+                                    )
+                            else:
+                                # Modified PgUp/PgDn (e.g. \e[5;2~) — unhandled in v1,
+                                # drain like any other unrecognized sequence.
+                                self._drain_escape_sequence(fd)
+                        elif next2 in ('1', '4'):  # Home \e[1~ / End \e[4~
+                            rlist, _, _ = _select.select([fd], [], [], 0.05)
+                            next3 = os.read(fd, 1).decode('utf-8', errors='replace') if rlist else ''
+                            if next3 == '~':
+                                changed = self.scroll_to_top() if next2 == '1' else self.scroll_to_bottom()
+                                if changed:
+                                    num_display_lines, cursor_pos = self._repaint_with_input(
+                                        fd, prompt, current_input, cursor_pos,
+                                    )
+                            else:
+                                # Modified Home/End (e.g. \e[1;5H) — unhandled in v1.
+                                self._drain_escape_sequence(fd)
+                        elif next2 in ('H', 'F'):  # Home \e[H / End \e[F (no trailing byte)
+                            changed = self.scroll_to_top() if next2 == 'H' else self.scroll_to_bottom()
+                            if changed:
+                                num_display_lines, cursor_pos = self._repaint_with_input(
+                                    fd, prompt, current_input, cursor_pos,
+                                )
                         else:
-                            # Unrecognised sequence (Home \e[H/\e[1~, End \e[F/\e[4~,
-                            # PgUp \e[5~, PgDn \e[6~, Fn keys, etc.).
+                            # Unrecognised sequence (Fn keys, modified arrows, etc.).
                             # Drain any remaining bytes so they don't appear as text.
                             self._drain_escape_sequence(fd)
 
@@ -1566,16 +1726,24 @@ class ChatUI:
                     sys.stdout.write('\033[' + str(len(current_input) - cursor_pos) + 'D')
                 sys.stdout.flush()
 
+    def _print_frame(self) -> None:
+        """Clear and redraw the standard frame: panel, disclaimer, blank line.
+
+        The single place that draws the panel outside of a repaint mid-input,
+        so the scrolled view and the normal view can never drift apart.
+        """
+        self.console.clear()
+        self.console.print(self.render())
+        self.console.print(Align.center(Text(self.disclaimer, style="bright_white")))
+        self.console.print()
+
     def get_user_input(self) -> str:
         """Get user input from the console with history support (up/down arrows)"""
         self.stop_status()
         self.stop_thinking()  # ensure no spinner thread is writing to stdout while user types
         while True:
-            self.console.clear()
-            self.console.print(self.render())
-            self.console.print(Align.center(Text(self.disclaimer, style="bright_white")))
+            self._print_frame()
             try:
-                self.console.print()
                 user_input = self._input_with_history("➤ ")
                 self.add_message("user", user_input)
                 self.console.clear()
