@@ -52,11 +52,34 @@ the chat history instead of being inserted into the input line:
 - **Home** — jump to the oldest message
 - **End** — jump to the newest message
 
+There's also a vim-style scroll mode: a standalone **Esc** at the prompt
+toggles it, then `j`/`k` (or the arrow keys) step one page,
+`gg`/`G` jump to the oldest/newest message, and `Enter`/`i`/`Esc` return
+to typing.
+
+The visible window is **height-aware**, not a fixed number of messages:
+`ChatUI` measures each message's real rendered height (via Rich's word
+wrap) against however many rows are actually free in the terminal right
+now, and shows however many trailing messages fit. `display_messages`
+(default 15, passed to `ChatUI(...)`) is a *ceiling* on that count, not
+the count itself — a handful of verbose responses can fill the whole
+window well before `display_messages` is reached, and a terminal resize
+changes how many messages fit on the next repaint with no extra
+keypress needed.
+
 The footer under the chat panel always shows the visible range and the
-total message count (e.g. `Showing 12-26 of 140 messages`). Once you've
-scrolled back from the bottom it also says so and names the key that
-returns you to the latest messages (`— scrolled, End to jump to
+total message count (e.g. `Showing 12-26 of 140 messages`), reflecting
+the actual (height-fitted) window size, not `display_messages`. Once
+you've scrolled back from the bottom it also says so and names the key
+that returns you to the latest messages (`— scrolled, End to jump to
 latest`).
+
+Note: because the window size varies with position (it's driven by how
+tall the messages at that position happen to be, not a fixed count),
+`PgUp`/`k` followed by `PgDn`/`j` is not guaranteed to land you back on
+the exact same window you started from. `End` (or `G` in scroll mode)
+is the reliable way back to the bottom — it always jumps to offset 0
+rather than retracing steps.
 
 ## Known limitations
 
@@ -77,10 +100,21 @@ latest`).
   is called once per process and a fresh session id is generated per run;
   closing and reopening the client starts a new conversation with no
   history from the previous run.
-- **Scrolling is message-granular, not line-granular.** The v1 scrollback
-  window (`ChatUI._visible_messages()`) counts messages, not terminal
-  lines — nothing in the render path consults terminal size, so a single
-  message taller than the terminal still overflows the visible area.
+- **Scrolling is message-granular, not line-granular.** The scrollback
+  window (`ChatUI._visible_messages()`) now consults the real terminal
+  size and each message's actual rendered height (`_content_budget()`,
+  `_message_height()`), so it fits as many trailing messages as the
+  terminal has room for — but it still fits or drops whole messages, not
+  lines within one. A single message taller than the whole terminal
+  still overflows the visible area; sub-message (line-granular)
+  scrolling is not implemented.
+- **No live real-terminal verification of the height-aware scroll
+  window.** The behavior above is covered by an extensive unit and pty
+  test suite (measured/pinned terminal dimensions, real key-dispatch
+  loop), but no agent that built or reviewed it had an interactive tty
+  to confirm against. If you hit anything that looks off with a real
+  verbose session (`show_logs=True`, a few long turns, Esc, `k`/`j`),
+  it's worth a spot-check before relying on it further.
 - **Chat history is capped at `max_messages` (1000).** Raised in
   `dsh_tui/cli.py` from `ChatUI`'s original default of 100 specifically
   so the new scroll feature has meaningful depth to reach — the old
@@ -107,7 +141,7 @@ answer first and are called out honestly rather than implied to be free.
 | You want history to survive a restart | Probe whether reusing a `session_id` across `DeepSeekHarness` launches replays durable history, then pass it through the CLI | `api.py:120` `start_session` |
 | You want a debugging view of every event | Construct `ChatUI(show_logs=True)` and call `add_log` from the driver's ignore-branch | `chat_ui.py:277`, `:319` |
 | You want a second provider/model | Add template variables to `settings.yaml.template` — the schema is already shared across every dsh surface | `dsh_tui/settings.yaml.template` |
-| ⚠ Message-granular scrolling isn't enough (a single message overflows the terminal) | Deferred v1 scope decision — current windowing (`_visible_messages`) scrolls by message count, not by terminal lines. Needs the render path to consult terminal height per message before it can jump straight to a line offset | `chat_ui.py:210-261` `_visible_messages`, `_max_scroll_offset` |
+| A single message taller than the terminal still overflows | The scroll window is already height-aware (`_content_budget`, `_message_height`, `_fit_backward`/`_fit_forward`) — it fits as many whole messages as the terminal allows. What's left is sub-message (line-granular) scrolling within one oversized message, which is a separate, larger change: it needs a line offset *within* a message's rendered content, not just a count of whole messages | `chat_ui.py` `_visible_messages`, `_content_budget`, `_message_height` |
 | ⚠ You want mouse-wheel scrolling | Deferred by explicit user request this session (keyboard scrolling was tested first in tmux; mouse support was left for a separate pass if needed). This user's tmux config has `mouse off` globally, so wheel events wouldn't reach the app without also changing that tmux setting — implementing it needs xterm SGR mouse-reporting protocol support added to the raw-byte input loop, a comparable-sized addition to the keyboard bindings that just shipped, not a trivial one | `chat_ui.py:1428` `_input_with_history_unix` |
 
 Nothing in that table is a second implementation to reconcile with the

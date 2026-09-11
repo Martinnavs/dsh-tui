@@ -72,7 +72,7 @@ def main() -> None:
         ),
         # show_logs=True: add_tool_call/show_tool_start/add_tool_result/
         # show_tool_done all early-return when show_logs is False (see
-        # chat_ui.py), so this is required for acceptance criterion 3
+        # chat_ui/streaming.py), so this is required for acceptance criterion 3
         # (tool calls render inline, never invisibly) -- not optional.
         show_logs=True,
         # Default max_messages=100 caps scrollback at ~25 tool-using turns
@@ -97,12 +97,12 @@ def main() -> None:
                 # `turn/start` and the next event (e.g. a network failure
                 # while the spinner is running) can leave it spinning here.
                 # stop_thinking() is safe to call even when nothing is
-                # spinning (chat_ui.py's _stop_thinking_spinner no-ops on
+                # spinning (chat_ui/spinner.py's _stop_thinking_spinner no-ops on
                 # None state), so this is a harmless belt-and-suspenders call.
                 chat_ui.stop_thinking()
                 # notice() only prints -- get_user_input()'s next call clears
                 # the console before this line could ever be read (see
-                # chat_ui.py get_user_input()), and notice() never touches
+                # chat_ui/input.py get_user_input()), and notice() never touches
                 # self.messages, so without also recording it in history the
                 # failure would leave no trace after the redraw. Follow
                 # onit's own precedent of recording provider/turn failures
