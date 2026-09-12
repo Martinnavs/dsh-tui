@@ -1,15 +1,43 @@
-"""Vim-like scrollback over the chat history: pagination math and the
-scroll-offset state machine. Combined with the other ChatUI mixins in
-core.py.
+"""Vim-like scrollback over the chat history: a line buffer built once per
+render, pagination math over that buffer, and the scroll-offset state
+machine. Combined with the other ChatUI mixins in core.py.
 
 ``_render_message_into`` calls back into ``RenderingMixin``'s per-role
 render methods (``_render_user_message`` etc.) so painting and measuring
 a message can never disagree about what it looks like.
+
+The visible window is now expressed in rendered *lines* (rows), not
+messages: each message contributes zero or more rows to a single flat
+line buffer, and the scroll offset is a count of rows from the bottom.
+This is what makes a single message taller than the console reachable a
+row at a time instead of being all-or-nothing.
+
+Per-message line lists are cached keyed on ``Message`` object identity
+(a strong ref is held so ``id()`` cannot be recycled while cached). This
+cache is only ever correct because ``update_last_message``,
+``verification_end`` and ``verification_correction`` *replace* the
+``Message`` object rather than mutating it in place — a future change
+that started mutating a cached ``Message`` in place would silently serve
+stale rendered lines. Two cases are handled explicitly: legacy ``dict``
+messages (mutated in place by ``update_last_message``) are never cached,
+and ``tool_call`` entries are re-rendered when the context-usage label
+embedded in their header has changed since they were cached.
 """
+from bisect import bisect_left, bisect_right
+
 from rich.align import Align
 from rich.text import Text
 
 from .message import Message
+
+
+class _CacheEntry:
+    __slots__ = ("msg", "lines", "ctx_label")
+
+    def __init__(self, msg, lines, ctx_label=None):
+        self.msg = msg
+        self.lines = lines
+        self.ctx_label = ctx_label
 
 
 class ScrollbackMixin:
@@ -17,8 +45,9 @@ class ScrollbackMixin:
         """Append one message's rendering to `content`.
 
         The single place that decides how a message is painted, shared by
-        `render_messages()` (paints) and `_message_height()` (measures) so
-        the two can never disagree about what a message looks like.
+        `render_messages()` (paints) and the line-buffer builder below
+        (measures) so the two can never disagree about what a message
+        looks like.
         """
         role = msg.role if isinstance(msg, Message) else msg["role"]
         msg_content = msg.content if isinstance(msg, Message) else msg["content"]
@@ -36,19 +65,6 @@ class ScrollbackMixin:
                 self._render_tool_result_message(content, msg_name, msg_content, msg_time)
         else:
             self._render_assistant_message(content, msg_content, msg_time, msg_elapsed)
-
-    def _message_height(self, msg) -> int:
-        """Rendered row count of one message, standalone.
-
-        `render_lines` on a single message's Text always includes one
-        trailing blank line (the message body ends in `\\n`) that vanishes
-        once messages are concatenated — the `-1` here is what makes per-
-        message heights additive when summed by the fit loops below.
-        """
-        content = Text()
-        self._render_message_into(content, msg)
-        height = len(self.console.render_lines(content)) - 1
-        return max(0, height)
 
     def _content_budget(self) -> int:
         """Rows available for the message content inside the current frame.
@@ -70,89 +86,188 @@ class ScrollbackMixin:
             reserved += len(self.console.render_lines(self.render_logs_panel()))
         return max(1, self.console.size.height - reserved)
 
-    def _fit_backward(self, end: int) -> int:
-        """Count of messages ending at index `end` (exclusive) that fit, walking backward.
-
-        At least 1 when `end > 0`, capped at `self.display_messages`.
-        Falls back to the old fixed-count formula if measurement raises —
-        this is reachable from the raw-mode input loop outside any `try`,
-        so a raise here must not propagate.
+    def _invalidate_line_cache(self) -> None:
+        """Drop the per-message line cache. Called by `set_theme()` since
+        styles change without changing any of the global cache key's
+        components (console width, show_logs, model_name).
         """
-        if end <= 0:
-            return 0
+        self._line_cache = {}
+        self._line_cache_key = None
+
+    def _ctx_label_for(self, msg) -> "str | None":
+        if not isinstance(msg, Message) or msg.role != "tool_call":
+            return None
+        if self._context_pct > 0:
+            return self._fmt_ctx_label()
+        return None
+
+    def _rebuild_line_buffer(self) -> None:
+        """(Re)build the flat line buffer from `self.messages`.
+
+        Reuses cached per-message line lists wherever the cached entry's
+        `Message` is (by identity) still the one at that position and its
+        cache-affecting inputs haven't changed. Rebuilding the flat
+        concatenation itself is not skipped — it's measured at ~0.4ms warm
+        for 1000 messages, which is cheap enough to just always do.
+        """
+        key = (self.console.size.width, self.show_logs, self.model_name)
+        old_cache = getattr(self, "_line_cache", None)
+        if old_cache is None or getattr(self, "_line_cache_key", None) != key:
+            old_cache = {}
+
+        new_cache = {}
+        lines: list = []
+        starts_lines: list = []
+        starts_idx: list = []
+
+        for i, msg in enumerate(self.messages):
+            is_message = isinstance(msg, Message)
+            entry = None
+            if is_message:
+                candidate = old_cache.get(id(msg))
+                if candidate is not None and candidate.msg is msg:
+                    if candidate.ctx_label == self._ctx_label_for(msg):
+                        entry = candidate
+
+            if entry is None:
+                t = Text()
+                self._render_message_into(t, msg)
+                msg_lines = self.console.render_lines(t, pad=False, new_lines=True)[:-1]
+                entry = _CacheEntry(msg, msg_lines, self._ctx_label_for(msg) if is_message else None)
+
+            if is_message:
+                new_cache[id(msg)] = entry
+
+            if entry.lines:
+                starts_lines.append(len(lines))
+                starts_idx.append(i)
+                lines.extend(entry.lines)
+
+        self._line_cache = new_cache
+        self._line_cache_key = key
+        self._line_buffer = lines
+        self._line_starts_lines = starts_lines
+        self._line_starts_idx = starts_idx
+
+    def _ensure_line_buffer(self) -> None:
+        """Rebuild the line buffer, degrading to an empty buffer on any
+        failure. Reachable from the raw-mode input loop outside any
+        `try`, so a raise here must never propagate.
+        """
         try:
-            msgs = list(self.messages)
-            budget = self._content_budget()
-            count = 0
-            height_sum = 0
-            idx = end - 1
-            while idx >= 0 and count < self.display_messages:
-                h = self._message_height(msgs[idx])
-                candidate_total = height_sum + h + 1  # additive identity: sum(m_i) + 1
-                if count > 0 and candidate_total > budget:
-                    break
-                height_sum += h
-                count += 1
-                idx -= 1
-            return max(1, count)
+            self._rebuild_line_buffer()
         except Exception:
-            return min(self.display_messages, end)
+            self._line_buffer = []
+            self._line_starts_lines = []
+            self._line_starts_idx = []
+            self._line_cache = {}
+            self._line_cache_key = None
 
-    def _fit_forward(self, start: int = 0) -> int:
-        """Count of messages from index `start` that fit, walking forward.
+    def _is_first_line(self, line_idx: int) -> bool:
+        starts = self._line_starts_lines
+        pos = bisect_right(starts, line_idx) - 1
+        return pos >= 0 and starts[pos] == line_idx
 
-        Mirror of `_fit_backward`; see its docstring for the shared logic
-        and fallback behavior.
+    def _owning_message_index(self, line_idx: int):
+        starts = self._line_starts_lines
+        pos = bisect_right(starts, line_idx) - 1
+        if pos < 0:
+            return None
+        return self._line_starts_idx[pos]
+
+    def _window_bounds(self):
+        """`(start, end, header_msg_index)` for the current scroll offset.
+
+        `start`/`end` are line indices into `self._line_buffer` (half-open
+        range). `header_msg_index` is the index into `self.messages` whose
+        continuation header should be shown, or `None`.
+
+        Single-step, non-oscillating rule: shift `start` forward by one row
+        to make room for a continuation header only when the naive
+        (budget-sized) window would begin mid-message; if that shift lands
+        exactly on a message boundary, drop the header again rather than
+        re-deriving a new window (see ticket 01, Action item 3).
         """
-        n = len(self.messages)
-        if start >= n:
-            return 0
-        try:
-            msgs = list(self.messages)
-            budget = self._content_budget()
-            count = 0
-            height_sum = 0
-            idx = start
-            while idx < n and count < self.display_messages:
-                h = self._message_height(msgs[idx])
-                candidate_total = height_sum + h + 1  # additive identity: sum(m_i) + 1
-                if count > 0 and candidate_total > budget:
-                    break
-                height_sum += h
-                count += 1
-                idx += 1
-            return max(1, count)
-        except Exception:
-            return min(self.display_messages, n - start)
+        self._ensure_line_buffer()
+        total = len(self._line_buffer)
+        if total == 0:
+            return 0, 0, None
 
-    def _window_size(self) -> int:
-        """How many messages the current scroll offset's window actually shows."""
+        budget = max(1, self._content_budget())
+        offset = self._scroll_offset
         max_offset = self._max_scroll_offset()
-        offset = min(self._scroll_offset, max_offset)
-        end = len(self.messages) - offset
-        return self._fit_backward(end)
+        if offset < 0:
+            offset = 0
+        elif offset > max_offset:
+            offset = max_offset
 
-    def _forward_step(self) -> int:
-        """How many messages fit starting at the current window's end.
+        end = total - offset
+        tentative_start = max(0, end - budget)
 
-        The forward-direction mirror of `_window_size()`. `scroll_down` uses
-        this (not `_window_size()`) so the next window begins exactly where
-        the current one ends — the same tiling argument that makes
-        `scroll_up` gap-free (it moves back by exactly the window it is
-        leaving), applied in the other direction. Using `_window_size()`
-        here instead would page by the size of the window being *left*, and
-        with variable message heights the freshly re-measured next window
-        would not start where that left off — silently skipping messages
-        that would then be unreachable at any offset.
-        """
-        max_offset = self._max_scroll_offset()
-        offset = min(self._scroll_offset, max_offset)
-        end = len(self.messages) - offset
-        return self._fit_forward(end)
+        if tentative_start == 0 or budget <= 1 or self._is_first_line(tentative_start):
+            return tentative_start, end, None
+
+        start = tentative_start + 1
+        if self._is_first_line(start):
+            return start, end, None
+
+        header_idx = self._owning_message_index(tentative_start)
+        return start, end, header_idx
 
     def _max_scroll_offset(self) -> int:
-        """Furthest an offset can move back before hitting the oldest message."""
-        return max(0, len(self.messages) - self._fit_forward(0))
+        """Furthest an offset can move back before hitting the oldest line."""
+        try:
+            self._ensure_line_buffer()
+            total = len(self._line_buffer)
+            budget = max(1, self._content_budget())
+            return max(0, total - budget)
+        except Exception:
+            return 0
+
+    def _window_size(self) -> int:
+        """Content-line count of the window at the current scroll offset."""
+        try:
+            start, end, _ = self._window_bounds()
+            return max(0, end - start)
+        except Exception:
+            return 0
+
+    def _forward_step(self) -> int:
+        """Content-line count of the window that *starts* at the current
+        window's end.
+
+        `scroll_down` uses this (not `_window_size()`) so the next window
+        begins at (or, in the rare header-boundary case, at most one row
+        before) exactly where the current one ends — mirroring the
+        message-granular tiling argument this method's docstring used to
+        make, now expressed in lines. Using `_window_size()` here instead
+        would page by the size of the window being *left*; with variable
+        message heights the freshly re-measured next window would not
+        start where that left off, silently skipping lines that would then
+        be unreachable at any offset.
+        """
+        try:
+            self._ensure_line_buffer()
+            total = len(self._line_buffer)
+            if total == 0:
+                return 0
+            budget = max(1, self._content_budget())
+            max_offset = self._max_scroll_offset()
+            offset = self._scroll_offset
+            if offset < 0:
+                offset = 0
+            elif offset > max_offset:
+                offset = max_offset
+            end = total - offset
+            if end >= total:
+                return 0
+            header_cost = 0
+            if budget > 1 and end != 0 and not self._is_first_line(end):
+                header_cost = 1
+            step = max(1, budget - header_cost)
+            return min(step, total - end)
+        except Exception:
+            return 0
 
     def _reset_scroll(self) -> None:
         """Snap the view back to the bottom; called whenever new content arrives."""
@@ -193,12 +308,20 @@ class ScrollbackMixin:
         return changed
 
     def _visible_messages(self) -> list:
-        """The slice of `self.messages` the current scroll offset shows."""
-        if not self.messages:
+        """The messages with >= 1 line in the current scroll offset's window."""
+        try:
+            if not self.messages:
+                return []
+            start, end, _ = self._window_bounds()
+            if start >= end:
+                return []
+            starts_lines = self._line_starts_lines
+            starts_idx = self._line_starts_idx
+            lo = bisect_right(starts_lines, start) - 1
+            if lo < 0:
+                lo = 0
+            hi = bisect_left(starts_lines, end)
+            msgs = list(self.messages)
+            return [msgs[i] for i in starts_idx[lo:hi]]
+        except Exception:
             return []
-        max_offset = self._max_scroll_offset()
-        offset = min(self._scroll_offset, max_offset)
-        msgs = list(self.messages)
-        end = len(msgs) - offset
-        count = self._window_size()
-        return msgs[end - count:end]

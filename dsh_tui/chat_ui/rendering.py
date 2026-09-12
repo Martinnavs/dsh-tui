@@ -2,16 +2,21 @@
 the logs panel, and the startup banner. Combined with the other ChatUI
 mixins in core.py.
 
-Relies on ``ScrollbackMixin`` for ``_visible_messages``/``_max_scroll_offset``.
+Relies on ``ScrollbackMixin`` for the line buffer, ``_window_bounds``,
+and ``_max_scroll_offset``.
 """
 import re
+from itertools import chain
 
 from rich.align import Align
 from rich.box import ROUNDED, HEAVY
 from rich.console import Group
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.segment import Segments
 from rich.text import Text
+
+from .message import Message
 
 
 class RenderingMixin:
@@ -63,6 +68,58 @@ class RenderingMixin:
             subtitle_align="right"
         )
 
+    def _render_continuation_header(self, msg) -> Text:
+        """One-row header shown when the visible window's first line is not
+        a message's first line — carries that message's role marker, model
+        label (assistant), and its own timestamp, plus a "(continued)" tag.
+
+        Forced to exactly one rendered row (`no_wrap`, ellipsis overflow)
+        regardless of terminal width, since it occupies one row of the
+        content budget rather than an extra one (see `_window_bounds`).
+        """
+        role = msg.role if isinstance(msg, Message) else msg["role"]
+        msg_time = msg.timestamp if isinstance(msg, Message) else msg["time"]
+        msg_name = msg.name if isinstance(msg, Message) else msg.get("name", "")
+
+        t = Text(no_wrap=True, overflow="ellipsis")
+        if role == "user":
+            t.append("┌─ 👤 You ", style=self.theme.styles.get("user", "bold cyan"))
+            t.append(f"[{msg_time}]", style=self.theme.styles.get("timestamp", "cyan"))
+        elif role == "tool_call":
+            t.append(f"┌─ ⚙️  {msg_name} ", style="bold dark_orange3")
+            t.append(f"[{msg_time}]", style=self.theme.styles.get("timestamp", "cyan"))
+        elif role == "tool_result":
+            t.append(f"┌─ ↩  {msg_name} ", style="bold green")
+            t.append(f"[{msg_time}]", style=self.theme.styles.get("timestamp", "cyan"))
+        else:
+            label = f"┌─ 🤖 AI ({self.model_name}) " if self.model_name else "┌─ 🤖 AI "
+            t.append(label, style=self.theme.styles.get("assistant", "bold magenta"))
+            t.append(f"[{msg_time}]", style=self.theme.styles.get("timestamp", "dim magenta"))
+        t.append(" (continued)", style="dim")
+        return t
+
+    def _footer_subtitle(self, start: int, end: int, total: int, header_shown: bool) -> tuple:
+        """Footer wording for `render_messages()`'s footer `Rule`.
+
+        1-indexed inclusive line numbers, so the range names what a person
+        counting rows on screen would actually see.
+        """
+        if self.data_path:
+            return f"📁 {self.data_path}", "left"
+
+        msg_count = len(self.messages)
+        if total == 0:
+            start_1, end_1 = 0, 0
+        else:
+            start_1, end_1 = start + 1, end
+
+        subtitle = f"Lines {start_1}-{end_1} of {total} · {msg_count} msgs"
+        if header_shown:
+            subtitle += " · continued"
+        if total - end > 0:
+            subtitle += " · scrolled, End for latest"
+        return subtitle, "right"
+
     def render_messages(self) -> Group:
         """
         Render all messages with error handling.
@@ -74,32 +131,27 @@ class RenderingMixin:
             if not self.messages:
                 return self._render_welcome_panel()
 
-            content = Text()
-            display_msgs = self._visible_messages()
+            start, end, header_idx = self._window_bounds()
+            total = len(self._line_buffer)
+            visible_lines = self._line_buffer[start:end]
+            body = Segments(chain.from_iterable(visible_lines))
 
-            for msg in display_msgs:
-                self._render_message_into(content, msg)
+            subtitle, subtitle_align = self._footer_subtitle(
+                start, end, total, header_idx is not None,
+            )
 
-            if self.data_path:
-                subtitle = f"📁 {self.data_path}"
-                subtitle_align = "left"
-            else:
-                total = len(self.messages)
-                offset = min(self._scroll_offset, self._max_scroll_offset())
-                if offset == 0:
-                    subtitle = f"Showing last {len(display_msgs)} of {total} messages"
-                else:
-                    end = total - offset
-                    start = end - len(display_msgs) + 1
-                    subtitle = (
-                        f"Showing {start}-{end} of {total} messages "
-                        f"— scrolled, End to jump to latest"
-                    )
-                subtitle_align = "right"
-
-            header = Rule("[bold white]💬 Chat History[/]", characters="━", style="blue")
-            footer = Rule(subtitle, characters="━", style="blue", align=subtitle_align)
-            return Group(header, Text(""), content, footer)
+            group_items = [
+                Rule("[bold white]💬 Chat History[/]", characters="━", style="blue"),
+                Text(""),
+            ]
+            if header_idx is not None:
+                msgs = list(self.messages)
+                group_items.append(self._render_continuation_header(msgs[header_idx]))
+            group_items.append(body)
+            group_items.append(
+                Rule(subtitle, characters="━", style="blue", align=subtitle_align)
+            )
+            return Group(*group_items)
 
         except Exception as e:
             # Fallback rendering on error - ensures UI doesn't crash

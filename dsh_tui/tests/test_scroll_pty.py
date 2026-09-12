@@ -37,23 +37,28 @@ import pytest
 from rich.console import Console
 
 from dsh_tui.chat_ui import ChatUI, Message
+from dsh_tui.tests.scroll_helpers import fill as _fill
+from dsh_tui.tests.scroll_helpers import make_ui as _make_ui_with_height
+from dsh_tui.tests.scroll_helpers import strip_ansi, tall_message
 
 JOIN_TIMEOUT = 5.0
 
 
 def _make_ui(display_messages: int = 5) -> ChatUI:
+    # Constructed directly (not via `scroll_helpers.make_ui`) because this
+    # helper deliberately exercises passing `display_messages` into the
+    # real `ChatUI` constructor for API-compatibility coverage (Action
+    # item 6: the parameter is retained but no longer bounds the window).
+    # Task 01 (line-based scrollback) retired `display_messages` as a
+    # windowing ceiling — the terminal height is now the only thing that
+    # creates scroll room, so this height is pinned small enough (unlike
+    # the old height=1000 fixture) that 12 short messages still overflow
+    # the content budget. Offset assertions below compute the expected
+    # step from `_window_size()`/`_max_scroll_offset()` rather than
+    # hardcoding numbers derived from the old message-count cap.
     ui = ChatUI(display_messages=display_messages, show_logs=False)
-    # Height pinned explicitly tall so the height-aware windowing gate
-    # (see chat_ui.py's _content_budget/_fit_backward/_fit_forward) is
-    # non-binding here; this file's exact-offset assertions are about the
-    # raw-mode key dispatch, not the height gate itself.
-    ui.console = Console(file=StringIO(), width=100, height=1000)
+    ui.console = Console(file=StringIO(), width=100, height=15)
     return ui
-
-
-def _fill(ui: ChatUI, n: int) -> None:
-    for i in range(n):
-        ui.messages.append(Message(role="assistant", content=f"m{i}", timestamp="t"))
 
 
 @pytest.fixture
@@ -134,7 +139,10 @@ def _run_input_loop(ui, slave_fd, result_q):
 def test_pgup_ctrlu_end_scroll_without_leaking_tilde(pty_pair):
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
-    _fill(ui, 12)  # max offset = 7
+    _fill(ui, 12)
+    max_offset = ui._max_scroll_offset()
+    assert max_offset > 0, "fixture must actually create scroll room"
+    step = ui._window_size()
 
     drain_stop, drain_thread = _start_drain(master_fd)
     result_q: "queue.Queue" = queue.Queue()
@@ -159,17 +167,22 @@ def test_pgup_ctrlu_end_scroll_without_leaking_tilde(pty_pair):
     # (TCSAFLUSH by default — see test_typeahead_survives... docstring
     # below for why bytes written before that call would be discarded)
 
-    # PgUp: \e[5~ -> scroll_up(), one page of 5.
+    # PgUp: \e[5~ -> scroll_up(), one page.
     os.write(master_fd, b"\x1b[5~")
-    assert _wait_for(lambda: ui._scroll_offset == 5), (
-        f"PgUp did not move offset to 5 (got {ui._scroll_offset})"
+    assert _wait_for(lambda: ui._scroll_offset == min(max_offset, step)), (
+        f"PgUp did not move offset to {min(max_offset, step)} (got {ui._scroll_offset})"
     )
 
-    # Ctrl+U: another scroll_up(), clamped at max offset 7.
-    os.write(master_fd, b"\x15")
-    assert _wait_for(lambda: ui._scroll_offset == 7), (
-        f"Ctrl+U did not clamp offset to 7 (got {ui._scroll_offset})"
-    )
+    # Ctrl+U: keep paging up until clamped at max offset.
+    guard = 0
+    while ui._scroll_offset < max_offset and guard < 50:
+        before = ui._scroll_offset
+        os.write(master_fd, b"\x15")
+        assert _wait_for(lambda: ui._scroll_offset != before), (
+            "Ctrl+U made no progress toward max offset"
+        )
+        guard += 1
+    assert ui._scroll_offset == max_offset
 
     # End: \e[4~ -> scroll_to_bottom().
     os.write(master_fd, b"\x1b[4~")
@@ -211,6 +224,9 @@ def test_typeahead_survives_scroll_repaint_tcsadrain(pty_pair):
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
     _fill(ui, 12)
+    max_offset = ui._max_scroll_offset()
+    assert max_offset > 0, "fixture must actually create scroll room"
+    expected_offset = min(max_offset, ui._window_size())
 
     drain_stop, drain_thread = _start_drain(master_fd)
     result_q: "queue.Queue" = queue.Queue()
@@ -237,7 +253,7 @@ def test_typeahead_survives_scroll_repaint_tcsadrain(pty_pair):
     assert payload == "ok", (
         f"type-ahead queued before the repaint was dropped or corrupted: {payload!r}"
     )
-    assert ui._scroll_offset == 5
+    assert ui._scroll_offset == expected_offset
 
 
 def test_bytes_arriving_inside_repaint_termios_window_survive(pty_pair):
@@ -273,7 +289,9 @@ def test_bytes_arriving_inside_repaint_termios_window_survive(pty_pair):
     """
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
-    _fill(ui, 12)  # max offset = 7
+    _fill(ui, 12)
+    max_offset = ui._max_scroll_offset()
+    assert max_offset > 0, "fixture must actually create scroll room"
 
     injected = {"done": False}
     original_print_frame = ui._print_frame
@@ -298,8 +316,8 @@ def test_bytes_arriving_inside_repaint_termios_window_survive(pty_pair):
     time.sleep(0.2)  # let the loop's own initial tty.setraw(fd) run first
 
     os.write(master_fd, b"ab")
-    # Home -> scroll_to_top(): offset 0 -> 7 (changed), triggers the
-    # repaint whose _print_frame() call is where the burst above gets
+    # Home -> scroll_to_top(): offset 0 -> max_offset (changed), triggers
+    # the repaint whose _print_frame() call is where the burst above gets
     # injected mid-window. Using Home (not PgUp) means the Ctrl+U inside
     # the injected burst lands with the view already at max offset, so
     # `scroll_up()` there is a no-op (no nested repaint to reason about).
@@ -318,7 +336,7 @@ def test_bytes_arriving_inside_repaint_termios_window_survive(pty_pair):
         f"corrupted (VKILL-style truncation would show as 'abz' or similar "
         f"missing 'xy'): {payload!r}"
     )
-    assert ui._scroll_offset == 7, "Ctrl+U during the window must not itself repaint or move the offset here"
+    assert ui._scroll_offset == max_offset, "Ctrl+U during the window must not itself repaint or move the offset here"
 
 
 def test_scroll_mode_esc_toggle_jk_gg_G_and_arrows_scroll_not_history(pty_pair):
@@ -333,7 +351,10 @@ def test_scroll_mode_esc_toggle_jk_gg_G_and_arrows_scroll_not_history(pty_pair):
     """
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
-    _fill(ui, 12)  # max offset = 7
+    _fill(ui, 12)
+    max_offset = ui._max_scroll_offset()
+    assert max_offset > 0, "fixture must actually create scroll room"
+    window_size = ui._window_size()
     ui.input_history.append("previous message")
 
     drain_stop, drain_thread = _start_drain(master_fd)
@@ -351,24 +372,26 @@ def test_scroll_mode_esc_toggle_jk_gg_G_and_arrows_scroll_not_history(pty_pair):
     os.write(master_fd, b"\x1b")
     time.sleep(0.15)
 
-    os.write(master_fd, b"k")  # scroll_up(): 0 -> 5
-    assert _wait_for(lambda: ui._scroll_offset == 5), (
+    os.write(master_fd, b"k")  # scroll_up(): 0 -> window_size
+    assert _wait_for(lambda: ui._scroll_offset == min(max_offset, window_size)), (
         f"'k' did not scroll up while in scroll mode (got {ui._scroll_offset})"
     )
+    after_k = ui._scroll_offset
+    expected_after_up = min(max_offset, after_k + ui._window_size())
 
-    os.write(master_fd, b"\x1b[A")  # Up arrow: scroll_up(), clamped at 7
-    assert _wait_for(lambda: ui._scroll_offset == 7), (
+    os.write(master_fd, b"\x1b[A")  # Up arrow: scroll_up(), further up
+    assert _wait_for(lambda: ui._scroll_offset == expected_after_up), (
         f"Up arrow did not scroll in scroll mode — got {ui._scroll_offset}; "
-        f"if it recalled history instead this would still read 5"
+        f"if it recalled history instead this would still read {after_k}"
     )
 
-    os.write(master_fd, b"j")  # scroll_down(): 7 -> 2
-    assert _wait_for(lambda: ui._scroll_offset == 2), (
+    os.write(master_fd, b"j")  # scroll_down(): move back toward bottom
+    assert _wait_for(lambda: ui._scroll_offset < max_offset), (
         f"'j' did not scroll down while in scroll mode (got {ui._scroll_offset})"
     )
 
-    os.write(master_fd, b"gg")  # scroll_to_top(): -> 7
-    assert _wait_for(lambda: ui._scroll_offset == 7), (
+    os.write(master_fd, b"gg")  # scroll_to_top(): -> max_offset
+    assert _wait_for(lambda: ui._scroll_offset == max_offset), (
         f"'gg' did not jump to top (got {ui._scroll_offset})"
     )
 
@@ -403,6 +426,9 @@ def test_scroll_mode_exit_via_enter_and_i_preserve_typed_buffer(pty_pair):
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
     _fill(ui, 12)
+    max_offset = ui._max_scroll_offset()
+    assert max_offset > 0, "fixture must actually create scroll room"
+    expected_after_k = min(max_offset, ui._window_size())
 
     drain_stop, drain_thread = _start_drain(master_fd)
     result_q: "queue.Queue" = queue.Queue()
@@ -417,8 +443,8 @@ def test_scroll_mode_exit_via_enter_and_i_preserve_typed_buffer(pty_pair):
 
     os.write(master_fd, b"\x1b")  # enter scroll mode
     time.sleep(0.15)
-    os.write(master_fd, b"k")  # scroll_up(): 0 -> 5
-    assert _wait_for(lambda: ui._scroll_offset == 5)
+    os.write(master_fd, b"k")  # scroll_up(): 0 -> expected_after_k
+    assert _wait_for(lambda: ui._scroll_offset == expected_after_k)
 
     os.write(master_fd, b"\r")  # Enter — exit scroll mode, must not submit
     time.sleep(0.15)
@@ -588,14 +614,6 @@ def test_scroll_mode_paste_start_exits_mode_instead_of_dropping_content(pty_pair
     )
 
 
-def _make_ui_with_height(
-    height: int, display_messages: int = 15, show_logs: bool = True, width: int = 80,
-) -> ChatUI:
-    ui = ChatUI(display_messages=display_messages, show_logs=show_logs)
-    ui.console = Console(file=StringIO(), width=width, height=height)
-    return ui
-
-
 def _start_capturing_drain(master_fd):
     """Like `_start_drain`, but accumulates read bytes instead of discarding
     them, so a test can inspect what was actually printed (e.g. which
@@ -638,7 +656,7 @@ def test_scroll_mode_shows_real_prompt_with_few_but_tall_messages(pty_pair):
     `test_height_gate_fires_with_few_but_tall_messages` does.
     """
     master_fd, slave_fd = pty_pair
-    ui = _make_ui_with_height(24, display_messages=15, show_logs=True, width=80)
+    ui = _make_ui_with_height(height=24, show_logs=True, width=80)
     tall_content = "\n".join(f"line{i}" for i in range(20))
     for i in range(4):
         ui.messages.append(Message(role="assistant", content=f"{tall_content}-{i}", timestamp="t"))
@@ -720,7 +738,7 @@ def test_scroll_mode_lone_g_does_not_swallow_the_exit_key(pty_pair):
     """
     master_fd, slave_fd = pty_pair
     ui = _make_ui(display_messages=5)
-    _fill(ui, 12)  # max offset = 7
+    _fill(ui, 12)
 
     drain_stop, drain_thread = _start_drain(master_fd)
     result_q: "queue.Queue" = queue.Queue()
@@ -755,3 +773,142 @@ def test_scroll_mode_lone_g_does_not_swallow_the_exit_key(pty_pair):
     assert payload == "ok", (
         f"lone 'g' left scroll mode stuck, swallowing the 'i' exit key: {payload!r}"
     )
+
+
+def test_tall_message_fully_reachable_via_real_key_dispatch(pty_pair):
+    """Ticket 02's pty-level statement of AC 1 from ticket 01: a message
+    taller than the console must be fully reachable *through the real key
+    dispatch loop* (PgUp/PgDn), not merely through direct calls to
+    `scroll_up()`/`scroll_down()` the way `test_scroll.py`'s
+    `test_tall_message_fully_reachable_scrolling_up_from_bottom` proves at
+    the unit level. This exercises the same escape-sequence parsing and
+    repaint path production actually uses.
+    """
+    master_fd, slave_fd = pty_pair
+    ui = _make_ui_with_height(height=10, width=60, show_logs=False)
+    ui.messages.append(tall_message(200))
+    ui._ensure_line_buffer()
+    all_ids = {id(line) for line in ui._line_buffer}
+
+    drain_stop, drain_thread = _start_drain(master_fd)
+    result_q: "queue.Queue" = queue.Queue()
+    thread = threading.Thread(
+        target=_run_input_loop, args=(ui, slave_fd, result_q), daemon=True
+    )
+    thread.start()
+
+    time.sleep(0.2)  # let the loop's own initial tty.setraw(fd) run first
+
+    def _visible_ids():
+        start, end, _ = ui._window_bounds()
+        return {id(line) for line in ui._line_buffer[start:end]}
+
+    seen = set(_visible_ids())
+    guard = 0
+    while ui._scroll_offset < ui._max_scroll_offset() and guard < 500:
+        before = ui._scroll_offset
+        os.write(master_fd, b"\x1b[5~")  # PgUp -> scroll_up()
+        assert _wait_for(lambda: ui._scroll_offset != before), (
+            "PgUp made no progress toward max offset"
+        )
+        seen.update(_visible_ids())
+        guard += 1
+    assert ui._scroll_offset == ui._max_scroll_offset(), "did not reach the top"
+    assert guard < 500, "reachability walk did not terminate"
+
+    guard = 0
+    while ui._scroll_offset > 0 and guard < 500:
+        before = ui._scroll_offset
+        os.write(master_fd, b"\x1b[6~")  # PgDn -> scroll_down()
+        assert _wait_for(lambda: ui._scroll_offset != before), (
+            "PgDn made no progress toward the bottom"
+        )
+        seen.update(_visible_ids())
+        guard += 1
+    assert ui._scroll_offset == 0, "did not return to the bottom"
+
+    assert seen == all_ids, (
+        f"{len(all_ids - seen)} lines never visible through real key dispatch"
+    )
+
+    os.write(master_fd, b"ok\r")
+
+    try:
+        kind, payload = result_q.get(timeout=JOIN_TIMEOUT)
+    finally:
+        drain_stop.set()
+        drain_thread.join(timeout=1)
+    thread.join(timeout=JOIN_TIMEOUT)
+    assert not thread.is_alive(), "input loop thread did not finish"
+    assert kind == "ok", f"input loop raised: {payload}"
+    assert payload == "ok", f"stray bytes leaked into input: {payload!r}"
+
+
+def test_continuation_header_visible_in_printed_frame_when_paged_mid_message(pty_pair):
+    """Pty-level check of AC 3: when real PgUp key dispatch lands the window
+    mid-message, the continuation header actually appears in the frame the
+    application prints to the terminal — not just in the internal
+    `_window_bounds()` state that `test_scroll.py`'s
+    `test_continuation_header_shown_when_window_starts_mid_message` checks
+    at the unit level.
+    """
+    master_fd, slave_fd = pty_pair
+    # No explicit `file=` on the console (unlike the other fixtures in this
+    # module): Rich's `Console.file` property re-reads `sys.stdout` on every
+    # print when `_file` is `None`, so leaving it unset is what makes the
+    # continuation header actually land in the bytes read back from
+    # `master_fd` instead of an internal `StringIO` nothing else observes.
+    ui = ChatUI(show_logs=False)
+    ui.console = Console(width=60, height=10)
+    ui.messages.append(tall_message(200))
+
+    stop, drain_thread, snapshot = _start_capturing_drain(master_fd)
+    result_q: "queue.Queue" = queue.Queue()
+    thread = threading.Thread(
+        target=_run_input_loop, args=(ui, slave_fd, result_q), daemon=True
+    )
+    thread.start()
+
+    time.sleep(0.2)  # let the loop's own initial tty.setraw(fd) run first
+
+    def _header_shown_internally():
+        _, _, header_idx = ui._window_bounds()
+        return header_idx is not None
+
+    # A single huge message spanning the whole buffer already starts
+    # "mid-message" even at offset 0 (only the very first line is a
+    # boundary), so checking `_header_shown_internally()` alone would pass
+    # trivially without any key ever being dispatched — and without
+    # `_print_frame()` (only called from inside a scroll-key branch) ever
+    # running against the real pty. An actual PgUp keypress, and waiting
+    # for the offset to move, is what proves this is exercised through the
+    # real key-dispatch/repaint path rather than the fixture's initial state.
+    before_offset = ui._scroll_offset
+    os.write(master_fd, b"\x1b[5~")  # PgUp -> scroll_up()
+    assert _wait_for(lambda: ui._scroll_offset != before_offset), (
+        "PgUp did not move the offset"
+    )
+    assert _header_shown_internally(), "fixture did not land mid-message"
+
+    def _header_printed():
+        return b"(continued)" in snapshot()
+
+    assert _wait_for(_header_printed), (
+        "continuation header never appeared in the printed pty frame"
+    )
+    printed = strip_ansi(snapshot().decode(errors="replace"))
+    assert "(continued)" in printed
+
+    os.write(master_fd, b"\x1b[4~")  # End -> scroll_to_bottom()
+    assert _wait_for(lambda: ui._scroll_offset == 0)
+    os.write(master_fd, b"ok\r")
+
+    try:
+        kind, payload = result_q.get(timeout=JOIN_TIMEOUT)
+    finally:
+        stop.set()
+        drain_thread.join(timeout=1)
+    thread.join(timeout=JOIN_TIMEOUT)
+    assert not thread.is_alive(), "input loop thread did not finish"
+    assert kind == "ok", f"input loop raised: {payload}"
+    assert payload == "ok", f"stray bytes leaked into input: {payload!r}"

@@ -30,10 +30,12 @@
 #      typing) so a mouse-wheel scroll that a terminal reports as plain
 #      arrow-key bytes (indistinguishable from a real keypress) can't be
 #      misread as input-history recall.
-#   5. render_messages() now windows by measured rendered height
-#      (Console.render_lines) instead of a fixed message count, so the
-#      visible slice actually fits the terminal; display_messages is a
-#      ceiling on that window rather than the count always shown.
+#   5. render_messages() now windows over a flat, per-line buffer built
+#      from Console.render_lines (with per-message caching) instead of a
+#      fixed message count, so the visible slice fits the terminal exactly
+#      and a single message taller than the console is reachable a row at
+#      a time. display_messages is retained for API compatibility but no
+#      longer bounds the window — the terminal height is the only ceiling.
 #   6. Split the originally-monolithic module into this package: ChatUI's
 #      responsibilities (scrollback math, frame rendering, spinners,
 #      token streaming, fact-check display, raw-terminal input) are each
@@ -97,8 +99,10 @@ class ChatUI(
             theme: Color theme ("white" or "dark"/"black")
             agent_cursor: Name of the AI agent
             max_messages: Maximum number of messages to keep in memory (default: 100)
-            display_messages: Ceiling on the number of recent messages displayed;
-                the actual count is whatever fits the terminal (default: 15)
+            display_messages: Retained for API compatibility; no longer bounds the
+                visible window. The terminal height is the only ceiling — the
+                window is whatever fits, built from a per-line scroll buffer
+                (default: 15)
             max_history: Maximum number of input history items to keep (default: 100)
             max_logs: Maximum number of execution logs to keep in memory (default: 100)
             display_logs: Number of recent logs to display (default: 10)
@@ -191,6 +195,10 @@ class ChatUI(
                 "prompt": "bold dark_blue",
                 "timestamp": "cyan"
             })
+        # Styles changed without changing the line-cache's own key (width,
+        # show_logs, model_name) — drop it explicitly so cached lines don't
+        # go stale under the old theme's colors.
+        self._invalidate_line_cache()
 
     def format_timestamp(self):
         return datetime.now().strftime("%I:%M %p %d %b")
