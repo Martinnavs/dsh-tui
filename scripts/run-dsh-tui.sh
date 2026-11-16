@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Launch dsh-tui (this repo) against the onit/Qwen vLLM endpoint via dsh's
-# `sdk` profile. Sources the host and API key from ~/.secrets/onit/ into
-# this process's environment only -- never printed, never written to a
-# config file in the clear. Same pattern as
-# ../another-harness/scripts/run-onit.sh and
+# Launch dsh-tui (this repo) against a dsh-compatible provider (default:
+# the onit/Qwen vLLM endpoint) via dsh's `sdk` profile. Sources the host
+# and API key from ~/.secrets/<provider>/ into this process's environment
+# only -- never printed, never written to a config file in the clear.
+# Same pattern as ../another-harness/scripts/run-onit.sh and
 # ../investigation/probe/run_probe.sh / run_probe3.sh.
 set -euo pipefail
 
-HOST_FILE="${ONIT_HOST_FILE:-$HOME/.secrets/onit/host_address.txt}"
-KEY_FILE="${ONIT_KEY_FILE:-$HOME/.secrets/onit/api_key.txt}"
 PROVIDER="${DSH_TUI_PROVIDER:-onit}"
 MODEL="${DSH_TUI_MODEL:-Qwen/Qwen3.8-27B}"
+HOST_FILE="${DSH_TUI_HOST_FILE:-$HOME/.secrets/$PROVIDER/host_address.txt}"
+KEY_FILE="${DSH_TUI_KEY_FILE:-$HOME/.secrets/$PROVIDER/api_key.txt}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -46,10 +46,11 @@ sed \
   -e "s#__DSH_TUI_PROVIDER__#${PROVIDER}#g" \
   -e "s#__DSH_TUI_MODEL__#${MODEL}#g" \
   -e "s#__DSH_TUI_BASE_URL__#${BASE_URL}#g" \
+  -e "s#__DSH_TUI_API_KEY_ENV__#DSH_TUI_API_KEY#g" \
   "$REPO_ROOT/dsh_tui/settings.yaml.template" \
   > "$DSH_HOME/settings.yaml"
 
-export ONIT_API_KEY="$(cat "$KEY_FILE" | tr -d '\n\r ')"
+export DSH_TUI_API_KEY="$(cat "$KEY_FILE" | tr -d '\n\r ')"
 export DSH_TUI_PROVIDER="$PROVIDER"
 export DSH_TUI_MODEL="$MODEL"
 export DSH_TUI_DSH_HOME="$DSH_HOME"

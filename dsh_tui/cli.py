@@ -5,7 +5,7 @@ DSH_HOME are set by ``scripts/run-dsh-tui.sh``, which renders
 ``settings.yaml.template`` into that DSH_HOME before this module ever runs.
 This module never reads a secrets file itself; it only reads
 ``os.environ`` (and doesn't even need the API key directly -- the dsh
-runtime subprocess reads ``ONIT_API_KEY`` itself via ``apiKeyEnv`` in
+runtime subprocess reads ``DSH_TUI_API_KEY`` itself via ``apiKeyEnv`` in
 ``settings.yaml``, per the discipline in ``scripts/run-dsh-tui.sh``).
 
 Main loop, per PLAN.md Task 4: ``harness.start_session(id)`` is called
@@ -46,12 +46,12 @@ def main() -> None:
     model = os.environ.get("DSH_TUI_MODEL", DEFAULT_MODEL)
     dsh_home = _dsh_home()
 
-    if not os.environ.get("ONIT_API_KEY"):
+    if not os.environ.get("DSH_TUI_API_KEY"):
         # The dsh runtime subprocess needs this (apiKeyEnv in settings.yaml);
         # failing fast here avoids a confusing auth error later. Never print
         # the value -- there is none to print, only its absence is checked.
         print(
-            "ONIT_API_KEY is not set -- run via scripts/run-dsh-tui.sh.",
+            "DSH_TUI_API_KEY is not set -- run via scripts/run-dsh-tui.sh.",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -3,11 +3,11 @@
 # placeholders below -- this file itself never holds a real host, model, or
 # key, and neither does the agent that wrote it.
 #
-# __DSH_TUI_PROVIDER__ / __DSH_TUI_MODEL__ / __DSH_TUI_BASE_URL__ default to
-# the onit/Qwen vLLM endpoint (see scripts/run-dsh-tui.sh) but are ordinary
-# template variables -- pointing this file at a different provider/model/
-# endpoint is growth table row 10 ("You want a second provider/model"),
-# not a rewrite.
+# __DSH_TUI_PROVIDER__ / __DSH_TUI_MODEL__ / __DSH_TUI_BASE_URL__ /
+# __DSH_TUI_API_KEY_ENV__ default to the onit/Qwen vLLM endpoint (see
+# scripts/run-dsh-tui.sh) but are ordinary template variables -- pointing
+# this file at a different provider/model/endpoint (e.g. opencode) is
+# growth table row 10 ("You want a second provider/model"), not a rewrite.
 #
 # compat.supportsDeveloperRole / compat.maxTokensField are required by this
 # backend regardless of provider id/model/URL (established in
@@ -15,7 +15,7 @@
 llm-pi-ai:
   providers:
     __DSH_TUI_PROVIDER__:
-      apiKeyEnv: ONIT_API_KEY
+      apiKeyEnv: __DSH_TUI_API_KEY_ENV__
       api: openai-completions
       baseURL: __DSH_TUI_BASE_URL__
       compat:

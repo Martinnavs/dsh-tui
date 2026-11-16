@@ -19,11 +19,15 @@ scripts/run-dsh-tui.sh
 This opens an interactive terminal chat against dsh's `sdk` profile,
 pointed at the onit/Qwen vLLM endpoint. Requirements:
 
-- `~/.secrets/onit/host_address.txt` and `~/.secrets/onit/api_key.txt` —
-  the same files `../another-harness/scripts/run-onit.sh` and
+- `~/.secrets/<provider>/host_address.txt` and
+  `~/.secrets/<provider>/api_key.txt`, where `<provider>` is
+  `$DSH_TUI_PROVIDER` (`onit` by default). For the default provider these
+  are the same files `../another-harness/scripts/run-onit.sh` and
   `investigation/probe/run_probe.sh` read. The script sources them into
   its own process's environment only; the API key is never logged,
-  printed, or written into a config file in the clear.
+  printed, or written into a config file in the clear. Override the file
+  paths directly with `DSH_TUI_HOST_FILE` / `DSH_TUI_KEY_FILE` if you'd
+  rather not use the `~/.secrets/<provider>/` convention.
 - A Python 3 interpreter on `PATH` able to run `python3 -m venv` — the
   venv itself does **not** need to exist ahead of time. `investigation/probe/.venv`
   (the same venv Task 1/3's probes used) doubles as dsh-tui's runtime venv;
@@ -37,6 +41,14 @@ Override the provider or model without editing any file:
 
 ```sh
 DSH_TUI_PROVIDER=onit DSH_TUI_MODEL=Qwen/Qwen3.8-27B scripts/run-dsh-tui.sh
+```
+
+For example, to route through an opencode endpoint instead, drop its host
+and key into `~/.secrets/opencode/host_address.txt` and
+`~/.secrets/opencode/api_key.txt` (same convention as onit's above) and run:
+
+```sh
+DSH_TUI_PROVIDER=opencode DSH_TUI_MODEL=<opencode-model-id> scripts/run-dsh-tui.sh
 ```
 
 Type at the `➤` prompt and press Enter to send a turn. Type `\bye`, or
